@@ -374,6 +374,69 @@ nav {
 }
 .afp-reset:hover { background: rgba(26,107,107,.08); }
 
+
+/* ── DATE MODE TOGGLE ───────────────────────────────── */
+.mode-toggle {
+  display: flex; gap: 0;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px; padding: 3px;
+  margin-bottom: 18px; width: fit-content;
+}
+.mode-toggle button {
+  padding: 8px 22px; border-radius: 7px; border: none;
+  background: transparent; cursor: pointer;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px; font-weight: 600;
+  color: rgba(245,240,232,.5); transition: all .2s;
+}
+.mode-toggle button.active {
+  background: var(--gold); color: var(--ink);
+  box-shadow: 0 3px 12px rgba(201,168,76,.35);
+}
+.date-mode-section { display: none; }
+.date-mode-section.visible { display: block; }
+
+/* ── AIRLINE FILTER PANEL ───────────────────────────── */
+.airline-filter-panel {
+  display: none; background: white; border-radius: 16px;
+  padding: 20px 24px; box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+.airline-filter-panel.visible { display: block; }
+.afp-header {
+  display: flex; align-items: center;
+  justify-content: space-between; margin-bottom: 14px;
+}
+.afp-title {
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.afp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.afp-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 100px;
+  border: 2px solid var(--border); background: white;
+  cursor: pointer; font-family: "DM Sans", sans-serif;
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  transition: all .2s; user-select: none;
+}
+.afp-chip:hover { border-color: var(--teal); }
+.afp-chip.excluded {
+  background: #f5f5f5; color: #bbb;
+  border-color: #e5e5e5; text-decoration: line-through;
+  opacity: .6;
+}
+.chip-price { font-size: 11px; color: var(--muted); font-weight: 500; margin-left: 2px; }
+.afp-chip.excluded .chip-price { color: #ccc; }
+.afp-reset {
+  background: none; border: 1px solid var(--teal);
+  color: var(--teal); font-size: 12px; font-weight: 600;
+  cursor: pointer; padding: 5px 12px; border-radius: 8px;
+  font-family: "DM Sans", sans-serif; transition: all .2s;
+}
+.afp-reset:hover { background: var(--teal); color: white; }
+
 /* Responsive */
 @media (max-width: 640px) {
   .hero { padding: 20px 20px 40px; }
@@ -414,46 +477,86 @@ nav {
       </div>
     </div>
 
-    <!-- Riga 2: date + passeggeri -->
-    <div class="search-grid four">
-      <div class="field">
-        <label>Mese</label>
-        <select id="month">
-          <option value="01">Gennaio</option>
-          <option value="02">Febbraio</option>
-          <option value="03">Marzo</option>
-          <option value="04">Aprile</option>
-          <option value="05">Maggio</option>
-          <option value="06">Giugno</option>
-          <option value="07">Luglio</option>
-          <option value="08" selected>Agosto</option>
-          <option value="09">Settembre</option>
-          <option value="10">Ottobre</option>
-          <option value="11">Novembre</option>
-          <option value="12">Dicembre</option>
-        </select>
+    <!-- Toggle modalità data -->
+    <div class="mode-toggle">
+      <button id="btnMonthMode" class="active" onclick="setDateMode('month')">📅 Cerca per mese</button>
+      <button id="btnExactMode" onclick="setDateMode('exact')">📌 Date precise</button>
+    </div>
+
+    <!-- MODALITÀ MESE -->
+    <div class="date-mode-section visible" id="sectionMonth">
+      <div class="search-grid four">
+        <div class="field">
+          <label>Mese di partenza</label>
+          <select id="month">
+            <option value="01">Gennaio</option>
+            <option value="02">Febbraio</option>
+            <option value="03">Marzo</option>
+            <option value="04">Aprile</option>
+            <option value="05">Maggio</option>
+            <option value="06">Giugno</option>
+            <option value="07">Luglio</option>
+            <option value="08" selected>Agosto</option>
+            <option value="09">Settembre</option>
+            <option value="10">Ottobre</option>
+            <option value="11">Novembre</option>
+            <option value="12">Dicembre</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Durata (giorni)</label>
+          <input id="days" type="number" min="1" max="90" value="7">
+        </div>
+        <div class="field">
+          <label>Passeggeri</label>
+          <select id="adults">
+            <option value="1">1 adulto</option>
+            <option value="2">2 adulti</option>
+            <option value="3">3 adulti</option>
+            <option value="4">4 adulti</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Classe</label>
+          <select id="cabin">
+            <option value="ECONOMY">Economy</option>
+            <option value="PREMIUM_ECONOMY">Premium Economy</option>
+            <option value="BUSINESS">Business</option>
+            <option value="FIRST">First Class</option>
+          </select>
+        </div>
       </div>
-      <div class="field">
-        <label>Durata (giorni)</label>
-        <input id="days" type="number" min="1" max="90" value="7">
-      </div>
-      <div class="field">
-        <label>Passeggeri</label>
-        <select id="adults">
-          <option value="1">1 adulto</option>
-          <option value="2">2 adulti</option>
-          <option value="3">3 adulti</option>
-          <option value="4">4 adulti</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Classe</label>
-        <select id="cabin">
-          <option value="ECONOMY">Economy</option>
-          <option value="PREMIUM_ECONOMY">Premium Economy</option>
-          <option value="BUSINESS">Business</option>
-          <option value="FIRST">First Class</option>
-        </select>
+    </div>
+
+    <!-- MODALITÀ DATE PRECISE -->
+    <div class="date-mode-section" id="sectionExact">
+      <div class="search-grid four">
+        <div class="field">
+          <label>Data partenza</label>
+          <input id="depDate" type="date">
+        </div>
+        <div class="field">
+          <label>Data ritorno</label>
+          <input id="retDate" type="date">
+        </div>
+        <div class="field">
+          <label>Passeggeri</label>
+          <select id="adults2">
+            <option value="1">1 adulto</option>
+            <option value="2">2 adulti</option>
+            <option value="3">3 adulti</option>
+            <option value="4">4 adulti</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Classe</label>
+          <select id="cabin2">
+            <option value="ECONOMY">Economy</option>
+            <option value="PREMIUM_ECONOMY">Premium Economy</option>
+            <option value="BUSINESS">Business</option>
+            <option value="FIRST">First Class</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -483,7 +586,7 @@ nav {
     </div>
 
     <div class="search-footer">
-      <span class="hint">Inserisci il codice IATA (3 lettere)</span>
+      <span class="hint" id="searchHint">Trova il giorno migliore del mese</span>
       <button class="btn-search" id="searchBtn" onclick="doSearch()">✈ Cerca voli</button>
     </div>
   </div>
@@ -535,6 +638,15 @@ nav {
     <div class="afp-chips" id="airlineChips"></div>
   </div>
 
+  <!-- AIRLINE FILTER CHIPS -->
+  <div class="airline-filter-panel" id="airlineFilterPanel">
+    <div class="afp-header">
+      <div class="afp-title">Filtra compagnie</div>
+      <button class="afp-reset" onclick="resetAirlineFilter()">Mostra tutte</button>
+    </div>
+    <div class="afp-chips" id="airlineChips"></div>
+  </div>
+
   <div class="flights-list" id="flightsList"></div>
 
 </section>
@@ -547,14 +659,14 @@ nav {
 </div>
 
 <script>
-// ── CONFIG ──────────────────────────────────────────────────────
+// ── CONFIG ───────────────────────────────────────────────────────
 const BACKEND = 'https://voyago-api.onrender.com';
 
 // ── DIZIONARIO COMPAGNIE ─────────────────────────────────────────
 const AIRLINES = {
   AC:'Air Canada', AF:'Air France', AY:'Finnair', AZ:'ITA Airways',
   AA:'American Airlines', AM:'Aeromexico', AV:'Avianca',
-  AT:'Royal Air Maroc', B6:'JetBlue', BA:'British Airways',
+  AT:'Royal Air Maroc', B6:'JetBlue Airways', BA:'British Airways',
   BT:'airBaltic', CA:'Air China', CI:'China Airlines',
   CM:'Copa Airlines', CX:'Cathay Pacific', CZ:'China Southern',
   DL:'Delta Air Lines', EI:'Aer Lingus', EK:'Emirates',
@@ -563,7 +675,7 @@ const AIRLINES = {
   GA:'Garuda Indonesia', GF:'Gulf Air', HA:'Hawaiian Airlines',
   HV:'Transavia', IB:'Iberia', JL:'Japan Airlines', JQ:'Jetstar',
   JU:'Air Serbia', KE:'Korean Air', KL:'KLM', KQ:'Kenya Airways',
-  LA:'LATAM', LH:'Lufthansa', LO:'LOT Polish Airlines',
+  LA:'LATAM Airlines', LH:'Lufthansa', LO:'LOT Polish Airlines',
   LX:'Swiss Int. Air Lines', LY:'El Al', MH:'Malaysia Airlines',
   MS:'EgyptAir', MU:'China Eastern', NH:'ANA All Nippon',
   NK:'Spirit Airlines', NZ:'Air New Zealand', OK:'Czech Airlines',
@@ -584,8 +696,12 @@ const EMOJIS = {
   TP:'🇵🇹', OS:'🇦🇹', LX:'🇨🇭', EY:'🇦🇪', VY:'🟠', FR:'🟡',
   U2:'🟠', W6:'🟣', B6:'🔵', F9:'🟢', NK:'💛', WN:'❤️',
 };
-const aName  = c => AIRLINES[c] || c;
-const aEmoji = c => EMOJIS[c]   || '✈️';
+
+// Restituisce il nome della compagnia solo se conosciuto, altrimenti null
+function aName(code) {
+  return AIRLINES[code] || null;
+}
+function aEmoji(code) { return EMOJIS[code] || '✈️'; }
 
 // ── UTILS ────────────────────────────────────────────────────────
 const pad = n => String(n).padStart(2, '0');
@@ -596,7 +712,10 @@ function fmtDur(iso) {
 }
 function fmtTime(iso) { return iso.substring(11, 16); }
 function fmtDate(isoDate) {
-  // accetta "2025-08-01" oppure "2025-08-01T00:00:00"
+  const s = isoDate.length > 10 ? isoDate : isoDate + 'T12:00:00';
+  return new Date(s).toLocaleDateString('it-IT', { day:'2-digit', month:'short', year:'numeric' });
+}
+function fmtDateShort(isoDate) {
   const s = isoDate.length > 10 ? isoDate : isoDate + 'T12:00:00';
   return new Date(s).toLocaleDateString('it-IT', { day:'2-digit', month:'short' });
 }
@@ -606,15 +725,13 @@ function addDays(isoDate, n) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 
-// Genera tutte le finestre sliding: [dep, dep+days] per ogni giorno del mese
-// incluso il rollover: se days=7 e mese=agosto, l'ultima finestra è 31 ago → 7 set
+// Sliding window: ogni giorno del mese come data di partenza
 function slidingWindows(monthVal, daysNum) {
   const now   = new Date();
   const month = parseInt(monthVal);
   let year    = now.getFullYear();
   if (month < now.getMonth() + 1) year++;
 
-  // Primo giorno disponibile (domani se siamo nel mese corrente, altrimenti 1°)
   let startDay = 1;
   if (month === now.getMonth() + 1 && year === now.getFullYear()) {
     startDay = now.getDate() + 1;
@@ -625,16 +742,28 @@ function slidingWindows(monthVal, daysNum) {
   for (let d = startDay; d <= daysInMonth; d++) {
     const dep = `${year}-${pad(month)}-${pad(d)}`;
     const ret = addDays(dep, daysNum);
-    windows.push({ dep, ret, label: `${pad(d)}/${pad(month)}` });
+    windows.push({ dep, ret });
   }
   return windows;
 }
 
 // ── STATO ────────────────────────────────────────────────────────
-let allOffers        = [];   // tutti i voli del giorno migliore
-let excludedAirlines = new Set();  // codici esclusi dal filtro chip
+let allOffers        = [];
+let excludedAirlines = new Set();
 let classLabel       = 'Economy';
-let lastByDate       = {};   // { dep: minPrice } per il grafico
+let currentDateMode  = 'month';  // 'month' o 'exact'
+
+// ── MODE TOGGLE ──────────────────────────────────────────────────
+function setDateMode(mode) {
+  currentDateMode = mode;
+  document.getElementById('btnMonthMode').classList.toggle('active', mode === 'month');
+  document.getElementById('btnExactMode').classList.toggle('active', mode === 'exact');
+  document.getElementById('sectionMonth').classList.toggle('visible', mode === 'month');
+  document.getElementById('sectionExact').classList.toggle('visible', mode === 'exact');
+  document.getElementById('searchHint').textContent = mode === 'month'
+    ? 'Trova il giorno migliore del mese'
+    : 'Cerca voli per le date esatte';
+}
 
 // ── LOADING ──────────────────────────────────────────────────────
 function loadingOn(msg, sub) {
@@ -661,7 +790,7 @@ async function fetchFlights(origin, dest, dep, ret, adults, cabin, maxPrice, non
   return data.data || [];
 }
 
-// ── PARSE ────────────────────────────────────────────────────────
+// ── PARSE OFFER ──────────────────────────────────────────────────
 function parseLeg(it) {
   const s0    = it.segments[0];
   const sN    = it.segments[it.segments.length - 1];
@@ -670,11 +799,11 @@ function parseLeg(it) {
     carrier:  s0.carrierCode,
     flightNum:`${s0.carrierCode}${s0.number || ''}`,
     depTime:  fmtTime(s0.departure.at),
-    depDate:  fmtDate(s0.departure.at),
+    depDate:  fmtDateShort(s0.departure.at),
     depIso:   s0.departure.at.slice(0, 10),
     depCode:  s0.departure.iataCode,
     arrTime:  fmtTime(sN.arrival.at),
-    arrDate:  fmtDate(sN.arrival.at),
+    arrDate:  fmtDateShort(sN.arrival.at),
     arrCode:  sN.arrival.iataCode,
     duration: fmtDur(it.duration),
     durRaw:   it.duration,
@@ -682,92 +811,132 @@ function parseLeg(it) {
     via: stops > 0 ? it.segments.slice(0,-1).map(s => s.arrival.iataCode).join(', ') : '',
   };
 }
+
 function parseOffer(raw) {
-  return {
-    raw,
-    out:   parseLeg(raw.itineraries[0]),
-    ret:   raw.itineraries[1] ? parseLeg(raw.itineraries[1]) : null,
-    price: parseFloat(raw.price.grandTotal),
-  };
+  const out   = parseLeg(raw.itineraries[0]);
+  const ret   = raw.itineraries[1] ? parseLeg(raw.itineraries[1]) : null;
+  const price = parseFloat(raw.price.grandTotal);
+
+  // Scarta offerte con compagnia sconosciuta (codici fittizi tipo A1, X1)
+  if (!AIRLINES[out.carrier]) return null;
+
+  return { raw, out, ret, price };
 }
 
-// ── RICERCA PRINCIPALE ───────────────────────────────────────────
+// ── RICERCA ──────────────────────────────────────────────────────
 async function doSearch() {
-  const origin   = document.getElementById('origin').value.trim().toUpperCase().slice(0, 3);
-  const dest     = document.getElementById('dest').value.trim().toUpperCase().slice(0, 3);
+  const origin = document.getElementById('origin').value.trim().toUpperCase().slice(0, 3);
+  const dest   = document.getElementById('dest').value.trim().toUpperCase().slice(0, 3);
+  if (!origin || !dest) { alert('Inserisci partenza e destinazione (es. FCO, JFK)'); return; }
+
+  const maxPrice = document.getElementById('maxPrice').value;
+  const nonStop  = document.getElementById('nonStop').value === 'true';
+
+  excludedAirlines = new Set();
+  allOffers = [];
+  document.getElementById('airlineFilterPanel').classList.remove('visible');
+  document.getElementById('results').classList.remove('visible');
+
+  if (currentDateMode === 'exact') {
+    await searchExact(origin, dest, maxPrice, nonStop);
+  } else {
+    await searchByMonth(origin, dest, maxPrice, nonStop);
+  }
+}
+
+// ── RICERCA CON DATE PRECISE ─────────────────────────────────────
+async function searchExact(origin, dest, maxPrice, nonStop) {
+  const dep    = document.getElementById('depDate').value;
+  const ret    = document.getElementById('retDate').value;
+  const adults = document.getElementById('adults2').value;
+  const cabin  = document.getElementById('cabin2').value;
+  classLabel   = document.getElementById('cabin2').options[document.getElementById('cabin2').selectedIndex].text;
+
+  if (!dep || !ret) { alert('Inserisci la data di partenza e di ritorno'); return; }
+  if (dep >= ret)   { alert('La data di ritorno deve essere successiva alla partenza'); return; }
+
+  loadingOn('Ricerca voli...', `${origin} → ${dest} · ${fmtDate(dep)} → ${fmtDate(ret)}`);
+
+  try {
+    const raw    = await fetchFlights(origin, dest, dep, ret, adults, cabin, maxPrice, nonStop, 20);
+    let offers   = raw.map(parseOffer).filter(Boolean);
+    offers.sort((a, b) => a.price - b.price);
+    allOffers = offers;
+
+    // Grafico non disponibile in modalità date precise
+    document.getElementById('chartBars').innerHTML =
+      '<div style="color:var(--muted);font-size:13px;margin:auto;">Grafico disponibile solo nella ricerca per mese</div>';
+
+    renderBannerExact(offers, dep, ret);
+    renderAirlineChips(offers);
+    renderResults(offers, origin, dest, dep, ret);
+  } catch(err) {
+    showError(err.message);
+  } finally {
+    loadingOff();
+  }
+}
+
+// ── RICERCA PER MESE (sliding window) ────────────────────────────
+async function searchByMonth(origin, dest, maxPrice, nonStop) {
   const monthVal = document.getElementById('month').value;
   const daysNum  = parseInt(document.getElementById('days').value) || 7;
   const adults   = document.getElementById('adults').value;
   const cabin    = document.getElementById('cabin').value;
-  const maxPrice = document.getElementById('maxPrice').value;
-  const nonStop  = document.getElementById('nonStop').value === 'true';
-  classLabel = document.getElementById('cabin').options[document.getElementById('cabin').selectedIndex].text;
-
-  if (!origin || !dest) { alert('Inserisci partenza e destinazione (es. FCO, JFK)'); return; }
+  classLabel     = document.getElementById('cabin').options[document.getElementById('cabin').selectedIndex].text;
 
   const windows = slidingWindows(monthVal, daysNum);
   if (!windows.length) { alert('Nessuna data futura disponibile per questo mese'); return; }
 
-  // Reset stato
-  excludedAirlines = new Set();
-  allOffers = [];
-  lastByDate = {};
-  document.getElementById('airlineFilterPanel').classList.remove('visible');
-  document.getElementById('results').classList.remove('visible');
-
-  loadingOn(`Analizzo ${windows.length} finestre nel mese...`, 'Cerco il periodo piu economico');
+  loadingOn(`Analizzo ${windows.length} giorni del mese...`, 'Cerco il periodo piu economico');
 
   try {
-    // ── FASE 1: sonda ogni giorno del mese, 1 risultato ciascuno ──────────
-    // Per non fare troppe chiamate in parallelo, le batchiamo a gruppi di 5
+    // Fase 1: sonda ogni giorno (batch da 5, 1 risultato ciascuno)
     const byDate = {};
     const batchSize = 5;
 
     for (let i = 0; i < windows.length; i += batchSize) {
       const batch = windows.slice(i, i + batchSize);
       loadingOn(
-        `Analizzo giorno ${i+1}/${windows.length}...`,
-        `Finestra ${batch[0].label} → ${addDays(batch[0].dep, daysNum).slice(8)}/${batch[0].dep.slice(5,7)}`
+        `Analizzo ${i+1}-${Math.min(i+batchSize, windows.length)} di ${windows.length} giorni...`,
+        'Confronto prezzi giorno per giorno'
       );
-
       const probes = await Promise.allSettled(
         batch.map(({ dep, ret }) =>
           fetchFlights(origin, dest, dep, ret, adults, cabin, maxPrice, nonStop, 1)
         )
       );
-
       probes.forEach((p, j) => {
         if (p.status !== 'fulfilled' || !p.value.length) return;
-        const dep   = batch[j].dep;
-        const price = parseFloat(p.value[0].price.grandTotal);
-        byDate[dep] = price;
+        const raw = p.value[0];
+        // Scarta compagnie sconosciute anche qui
+        const carrier = raw.itineraries[0].segments[0].carrierCode;
+        if (!AIRLINES[carrier]) return;
+        byDate[batch[j].dep] = parseFloat(raw.price.grandTotal);
       });
     }
 
     if (!Object.keys(byDate).length) {
-      throw new Error('Nessun volo trovato per questo mese. Prova un altra rotta o cambia mese.');
+      throw new Error('Nessun volo trovato per questo mese. Prova unaltra rotta o cambia mese.');
     }
 
-    // ── FASE 2: trova il giorno con il prezzo minimo ──────────────────────
-    const sorted  = Object.entries(byDate).sort((a, b) => a[1] - b[1]);
-    const bestDep = sorted[0][0];
+    // Fase 2: trova il giorno migliore
+    const bestDep = Object.entries(byDate).sort((a,b) => a[1]-b[1])[0][0];
     const bestRet = addDays(bestDep, daysNum);
-    lastByDate    = byDate;
 
-    // ── FASE 3: carica tutti i voli per il giorno migliore ────────────────
-    loadingOn('Periodo trovato! Carico i voli...', `Partenza ${fmtDate(bestDep)}`);
+    // Fase 3: carica tutti i voli per quel giorno
+    loadingOn('Periodo trovato! Carico i voli...', `${fmtDateShort(bestDep)} → ${fmtDateShort(bestRet)}`);
     const bestRaw = await fetchFlights(origin, dest, bestDep, bestRet, adults, cabin, maxPrice, nonStop, 20);
-    let offers = bestRaw.map(parseOffer);
+    let offers = bestRaw.map(parseOffer).filter(Boolean);
     offers.sort((a, b) => a.price - b.price);
     allOffers = offers;
 
-    // ── FASE 4: render ────────────────────────────────────────────────────
     renderChart(byDate, bestDep);
-    renderBanner(byDate, bestDep, bestRet, offers);
+    renderBannerMonth(byDate, bestDep, bestRet, offers);
     renderAirlineChips(offers);
-    renderResults(offers, origin, dest, bestDep, bestRet, daysNum);
+    renderResults(offers, origin, dest, bestDep, bestRet);
 
-  } catch (err) {
+  } catch(err) {
     showError(err.message);
   } finally {
     loadingOff();
@@ -777,7 +946,7 @@ async function doSearch() {
 // ── GRAFICO ──────────────────────────────────────────────────────
 function renderChart(byDate, bestDep) {
   const container = document.getElementById('chartBars');
-  const entries   = Object.entries(byDate).sort((a, b) => a[0].localeCompare(b[0]));
+  const entries   = Object.entries(byDate).sort((a,b) => a[0].localeCompare(b[0]));
   if (!entries.length) {
     container.innerHTML = '<div style="color:var(--muted);font-size:13px;margin:auto;">Dati non disponibili</div>';
     return;
@@ -789,53 +958,65 @@ function renderChart(byDate, bestDep) {
   container.innerHTML = entries.map(([dep, price]) => {
     const h      = Math.round(((price - minP) / (maxP - minP || 1)) * 80) + 20;
     const isBest = dep === bestDep;
-    const day    = dep.slice(8);   // "01"
+    const day    = dep.slice(8);
     return `<div class="bar-wrap">
-      <div class="bar${isBest ? ' best' : ''}" style="height:${h}px" title="${fmtDate(dep)} - E${price.toFixed(0)}"></div>
+      <div class="bar${isBest ? ' best' : ''}" style="height:${h}px" title="${fmtDateShort(dep)} - ${price.toFixed(0)}"></div>
       <div class="bar-label">${day}</div>
-      <div class="bar-price">E${price.toFixed(0)}</div>
+      <div class="bar-price">${price.toFixed(0)}</div>
     </div>`;
   }).join('');
 }
 
 // ── BANNER ───────────────────────────────────────────────────────
-function renderBanner(byDate, bestDep, bestRet, offers) {
+function renderBannerMonth(byDate, bestDep, bestRet, offers) {
   const bestPrice = offers.length ? offers[0].price : Math.min(...Object.values(byDate));
   const prices    = Object.values(byDate);
-  const worst     = Math.max(...prices);
-  const saving    = worst - Math.min(...prices);
+  const saving    = Math.max(...prices) - Math.min(...prices);
 
   document.getElementById('banner').style.display = 'flex';
   document.getElementById('bannerTitle').textContent =
-    `Periodo migliore: ${fmtDate(bestDep)} - ${fmtDate(bestRet)}`;
+    `Periodo migliore: ${fmtDateShort(bestDep)} → ${fmtDateShort(bestRet)}`;
   document.getElementById('bannerDesc').textContent = saving > 5
-    ? `Risparmi fino a E${saving.toFixed(0)} rispetto al giorno piu caro del mese`
+    ? `Risparmi fino a ${saving.toFixed(0)} rispetto al giorno piu costoso del mese`
     : 'La finestra con i prezzi piu bassi del mese';
-  document.getElementById('bannerPrice').textContent = `E${bestPrice.toFixed(0)}`;
+  document.getElementById('bannerPrice').textContent = `${bestPrice.toFixed(0)}`;
+}
+
+function renderBannerExact(offers, dep, ret) {
+  const bestPrice = offers.length ? offers[0].price : 0;
+  document.getElementById('banner').style.display = offers.length ? 'flex' : 'none';
+  if (!offers.length) return;
+  document.getElementById('bannerTitle').textContent = `${fmtDate(dep)} → ${fmtDate(ret)}`;
+  document.getElementById('bannerDesc').textContent  =
+    `${offers.length} voli trovati · Miglior prezzo con ${aName(offers[0].out.carrier) || offers[0].out.carrier}`;
+  document.getElementById('bannerPrice').textContent = `${bestPrice.toFixed(0)}`;
 }
 
 // ── AIRLINE CHIPS ────────────────────────────────────────────────
 function renderAirlineChips(offers) {
   if (!offers.length) return;
 
-  // Raggruppa per compagnia con prezzo minimo
+  // Solo compagnie conosciute
   const byCarrier = {};
   offers.forEach(o => {
-    const c = o.out.carrier;
+    const c    = o.out.carrier;
+    const name = aName(c);
+    if (!name) return;  // skip compagnie sconosciute
     if (!byCarrier[c] || o.price < byCarrier[c].price) {
-      byCarrier[c] = { price: o.price, name: aName(c), emoji: aEmoji(c) };
+      byCarrier[c] = { price: o.price, name, emoji: aEmoji(c) };
     }
   });
 
+  if (!Object.keys(byCarrier).length) return;
+
   const chips = Object.entries(byCarrier)
-    .sort((a, b) => a[1].price - b[1].price)
+    .sort((a,b) => a[1].price - b[1].price)
     .map(([code, info]) => `
       <div class="afp-chip" id="chip-${code}" onclick="toggleAirline('${code}')">
         <span>${info.emoji}</span>
         <span>${info.name}</span>
-        <span class="chip-price">da E${info.price.toFixed(0)}</span>
-      </div>
-    `).join('');
+        <span class="chip-price">da ${info.price.toFixed(0)}</span>
+      </div>`).join('');
 
   document.getElementById('airlineChips').innerHTML = chips;
   document.getElementById('airlineFilterPanel').classList.add('visible');
@@ -863,16 +1044,14 @@ function applyAirlineFilter() {
   renderFlights(filtered);
 }
 
-// ── RISULTATI ────────────────────────────────────────────────────
-function renderResults(offers, origin, dest, dep, ret, daysNum) {
+// ── RENDER RISULTATI ─────────────────────────────────────────────
+function renderResults(offers, origin, dest, dep, ret) {
   const sec = document.getElementById('results');
   sec.classList.add('visible');
-  setTimeout(() => sec.scrollIntoView({ behavior: 'smooth' }), 100);
-
-  document.getElementById('resTitle').textContent = `${origin} - ${dest}`;
+  setTimeout(() => sec.scrollIntoView({ behavior:'smooth' }), 100);
+  document.getElementById('resTitle').textContent = `${origin} → ${dest}`;
   document.getElementById('resCount').textContent =
-    `${offers.length} voli - ${fmtDate(dep)} - ${fmtDate(ret)} - ${daysNum} giorni`;
-
+    `${offers.length} voli · ${fmtDate(dep)} → ${fmtDate(ret)}`;
   renderFlights(offers);
 }
 
@@ -881,7 +1060,7 @@ function renderFlights(offers) {
   if (!offers.length) {
     list.innerHTML = `<div class="state-box"><div class="icon">🔍</div>
       <h3>Nessun volo trovato</h3>
-      <p>Prova a rimuovere qualche filtro o cambia compagnia.</p></div>`;
+      <p>Prova a deselezionare qualche compagnia o cambia i filtri.</p></div>`;
     return;
   }
   list.innerHTML = offers.map((o, i) => renderCard(o, i === 0)).join('');
@@ -889,7 +1068,7 @@ function renderFlights(offers) {
 
 function renderLeg(leg, label) {
   const stopTxt = leg.stops === 0
-    ? 'Diretto'
+    ? '✓ Diretto'
     : `${leg.stops} scalo${leg.stops > 1 ? 'i' : ''} via ${leg.via}`;
   return `
     <div class="leg">
@@ -915,21 +1094,22 @@ function renderLeg(leg, label) {
 }
 
 function renderCard(o, isTop) {
-  const c    = o.out.carrier;
+  const c        = o.out.carrier;
+  const airline  = aName(c) || c;
   const tags = [
-    isTop               ? { l:'Miglior prezzo',  cls:'green' } : null,
-    o.out.stops === 0   ? { l:'Andata diretta',  cls:'blue'  } : null,
-    o.ret && o.ret.stops === 0 ? { l:'Ritorno diretto', cls:'blue' } : null,
+    isTop                      ? { l:'🏆 Miglior prezzo',  cls:'green' } : null,
+    o.out.stops === 0          ? { l:'Andata diretta',      cls:'blue'  } : null,
+    o.ret && o.ret.stops === 0 ? { l:'Ritorno diretto',     cls:'blue'  } : null,
   ].filter(Boolean);
 
   return `
     <div class="flight-card${isTop ? ' top' : ''}">
-      ${isTop ? '<div class="top-badge">Miglior prezzo</div>' : ''}
+      ${isTop ? '<div class="top-badge">⭐ Miglior prezzo</div>' : ''}
       <div class="card-header">
         <div class="airline-info">
           <div class="airline-logo">${aEmoji(c)}</div>
           <div>
-            <div class="airline-name">${aName(c)}</div>
+            <div class="airline-name">${airline}</div>
             <div class="airline-meta">
               <span class="iata-badge">${c}</span>
               <span class="class-txt">${classLabel}</span>
@@ -938,12 +1118,12 @@ function renderCard(o, isTop) {
         </div>
         <div class="price-box">
           <div class="price-label">totale a/r</div>
-          <div class="price-val">E${o.price.toFixed(0)}</div>
+          <div class="price-val">€${o.price.toFixed(0)}</div>
           <div class="price-sub">tasse incluse</div>
         </div>
       </div>
-      ${renderLeg(o.out, 'Andata')}
-      ${o.ret ? renderLeg(o.ret, 'Ritorno') : ''}
+      ${renderLeg(o.out, '✈️ Andata')}
+      ${o.ret ? renderLeg(o.ret, '🔄 Ritorno') : ''}
       ${tags.length ? `<div class="card-tags">${tags.map(t => `<span class="tag ${t.cls}">${t.l}</span>`).join('')}</div>` : ''}
     </div>`;
 }
@@ -955,13 +1135,13 @@ function doSort(by, btn) {
   const visible = allOffers.filter(o => !excludedAirlines.has(o.out.carrier));
   if (!visible.length) return;
   const s = [...visible];
-  if (by === 'price')    s.sort((a, b) => a.price - b.price);
-  if (by === 'duration') s.sort((a, b) => a.out.durRaw.localeCompare(b.out.durRaw));
-  if (by === 'stops')    s.sort((a, b) => a.out.stops - b.out.stops);
+  if (by === 'price')    s.sort((a,b) => a.price - b.price);
+  if (by === 'duration') s.sort((a,b) => a.out.durRaw.localeCompare(b.out.durRaw));
+  if (by === 'stops')    s.sort((a,b) => a.out.stops - b.out.stops);
   renderFlights(s);
 }
 
-// ── FILTRI TOGGLE ────────────────────────────────────────────────
+// ── FILTRI AVANZATI ──────────────────────────────────────────────
 function toggleFilters() {
   document.getElementById('filters-extra').classList.toggle('open');
   document.getElementById('ftoggle').classList.toggle('open');
@@ -979,9 +1159,10 @@ function showError(msg) {
       <h3>Errore nella ricerca</h3>
       <p>${msg}</p>
     </div>`;
-  setTimeout(() => sec.scrollIntoView({ behavior: 'smooth' }), 100);
+  setTimeout(() => sec.scrollIntoView({ behavior:'smooth' }), 100);
 }
 </script>
+
 
 </body>
 </html>
