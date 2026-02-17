@@ -556,19 +556,39 @@ function fmtDate(iso) {
 }
 function fmtTime(iso) { return iso.substring(11,16); }
 
-function buildDates(monthVal, daysNum) {
-  const year = new Date().getFullYear();
-  const pad  = n => String(n).padStart(2,'0');
-  // Usa l'8 del mese come data partenza
-  let depYear = year;
+// Genera tutte le date di partenza disponibili nel mese (ogni 2 giorni per non fare troppe chiamate)
+function getAllDatesInMonth(monthVal) {
+  const pad      = n => String(n).padStart(2,'0');
+  const now      = new Date();
   const depMonth = parseInt(monthVal);
-  // Se il mese è passato, prendi il prossimo anno
-  const now = new Date();
-  if (depMonth < now.getMonth() + 1) depYear = year + 1;
-  const dep = `${depYear}-${pad(depMonth)}-08`;
-  const retDate = new Date(depYear, depMonth - 1, 8 + parseInt(daysNum));
-  const ret = `${retDate.getFullYear()}-${pad(retDate.getMonth()+1)}-${pad(retDate.getDate())}`;
-  return { dep, ret };
+  let   depYear  = now.getFullYear();
+  if (depMonth < now.getMonth() + 1) depYear++;
+
+  const maxDay  = new Date(depYear, depMonth, 0).getDate();
+  // Primo giorno disponibile
+  let startDay = 1;
+  if (depMonth === now.getMonth() + 1 && depYear === now.getFullYear()) {
+    startDay = now.getDate() + 1;
+  }
+  if (startDay > maxDay) return [];
+
+  // Una data per settimana: 1, 8, 15, 22 del mese (o il primo disponibile dopo)
+  const days = [1, 8, 15, 22].filter(d => d >= startDay && d <= maxDay);
+  if (!days.length) days.push(startDay);
+
+  return days.map(d => ({
+    dep: `${depYear}-${pad(depMonth)}-${pad(d)}`,
+    depDay: d,
+    year: depYear,
+    month: depMonth,
+  }));
+}
+
+function buildReturnDate(dep, daysNum) {
+  const pad = n => String(n).padStart(2,'0');
+  const d   = new Date(dep);
+  d.setDate(d.getDate() + parseInt(daysNum));
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 
 function parseItinerary(it) {
@@ -613,12 +633,12 @@ async function doSearch() {
   const maxPrice = document.getElementById('maxPrice').value;
   const nonStop  = document.getElementById('nonStop').value;
   const airlineFilter = document.getElementById('airline').value.trim().toUpperCase();
-
   classLabel = document.getElementById('cabin').options[document.getElementById('cabin').selectedIndex].text;
 
   if (!origin || !dest) { alert('Inserisci partenza e destinazione (es. FCO, JFK)'); return; }
 
-  const { dep, ret } = buildDates(monthVal, daysNum);
+  const dates = getAllDatesInMonth(monthVal);
+  if (!dates.length) { alert('Nessuna data disponibile per questo mese'); return; }
 
   // Loading
   const loading = document.getElementById('loading');
@@ -632,32 +652,84 @@ async function doSearch() {
   }, 900);
 
   try {
-    // Chiama il backend proxy
-    let url = `${BACKEND}/api/flights?origin=${origin}&destination=${dest}`
-      + `&departureDate=${dep}&returnDate=${ret}`
-      + `&adults=${adults}&travelClass=${cabin}&max=20`;
-    if (maxPrice) url += `&maxPrice=${maxPrice}`;
-    if (nonStop)  url += `&nonStop=${nonStop}`;
+    // Cerca voli per ogni settimana del mese in parallelo
+    document.getElementById('loadingMsg').textContent = `Analizzo ${dates.length} date nel mese...`;
+    document.getElementById('loadingSub').textContent = 'Cerco il periodo più economico';
 
-    const res  = await fetch(url);
-    const data = await res.json();
+    const results = await Promise.allSettled(dates.map(async ({ dep }) => {
+      const ret = buildReturnDate(dep, daysNum);
+      let url = `${BACKEND}/api/flights?origin=${origin}&destination=${dest}`
+        + `&departureDate=${dep}&returnDate=${ret}`
+        + `&adults=${adults}&travelClass=${cabin}&max=5`;
+      if (maxPrice) url += `&maxPrice=${maxPrice}`;
+      if (nonStop)  url += `&nonStop=${nonStop}`;
+      const res  = await fetch(url);
+      const data = await res.json();
+      if (!res.ok || data.error || !data.data?.length) return [];
+      return data.data.map(o => parseOffer(o, 0));
+    }));
+
     clearInterval(iv);
 
-    if (!res.ok || data.error) throw new Error(data.error || 'Nessun volo trovato');
+    // Raccoglie tutti i risultati validi
+    let allResults = [];
+    results.forEach(r => {
+      if (r.status === 'fulfilled') allResults = allResults.concat(r.value);
+    });
 
-    let offers = (data.data || []).map((o,i) => parseOffer(o,i));
-
-    // Filtro compagnia client-side
+    // Filtro compagnia
     if (airlineFilter) {
-      offers = offers.filter(o => o.outbound.carrier === airlineFilter ||
-                                   o.ret?.carrier === airlineFilter);
+      allResults = allResults.filter(o => o.outbound.carrier === airlineFilter);
     }
 
-    allOffers = offers;
-    renderAll(offers, origin, dest, dep, ret, monthVal, daysNum);
+    if (!allResults.length) throw new Error('Nessun volo trovato per questo mese. Prova con un'altra rotta o mese.');
 
-    // Prova a caricare prezzi mensili
-    fetchMonthlyPrices(origin, dest, monthVal);
+    // Ordina per prezzo e trova il giorno migliore
+    allResults.sort((a,b) => a.price - b.price);
+    allResults.forEach((o,i) => o.isTop = i === 0);
+
+    // Il giorno migliore è quello del volo più economico
+    const bestDep = allResults[0].outbound.depDate;
+    const bestRet = allResults[0].ret?.depDate || buildReturnDate(allResults[0].outbound.raw_dep, daysNum);
+
+    // Prendi tutti i voli del giorno migliore + altri giorni per mostrare varietà
+    // Raggruppa per data di partenza e prendi il migliore per ogni giorno
+    const byDate = {};
+    allResults.forEach(o => {
+      const d = o.outbound.depDate;
+      if (!byDate[d] || o.price < byDate[d].price) byDate[d] = o;
+    });
+
+    // Costruisci il grafico con i prezzi per settimana
+    const chartData = Object.entries(byDate).map(([date, o]) => ({ date, price: o.price }));
+    renderChartFromOffers(chartData, monthVal);
+
+    // Per i risultati finali: tutti i voli del giorno migliore (già trovati) + altri
+    // Ri-cerca il giorno migliore con max=20 per avere più opzioni
+    const bestDepFull = allResults[0].outbound.depDate;
+    const [y,m,d2] = bestDepFull.split('/').length > 1
+      ? bestDepFull.split('/').reverse()
+      : (() => { const p = allResults[0].raw.itineraries[0].segments[0].departure.at; return [p.slice(0,4), p.slice(5,7), p.slice(8,10)]; })();
+
+    const depIso = allResults[0].raw.itineraries[0].segments[0].departure.at.slice(0,10);
+    const retIso = allResults[0].raw.itineraries[1]
+      ? allResults[0].raw.itineraries[1].segments[0].departure.at.slice(0,10)
+      : buildReturnDate(depIso, daysNum);
+
+    let bestUrl = `${BACKEND}/api/flights?origin=${origin}&destination=${dest}`
+      + `&departureDate=${depIso}&returnDate=${retIso}`
+      + `&adults=${adults}&travelClass=${cabin}&max=20`;
+    if (maxPrice) bestUrl += `&maxPrice=${maxPrice}`;
+    if (nonStop)  bestUrl += `&nonStop=${nonStop}`;
+
+    const bestRes  = await fetch(bestUrl);
+    const bestData = await bestRes.json();
+    let finalOffers = (bestData.data || []).map((o,i) => parseOffer(o,i));
+    if (airlineFilter) finalOffers = finalOffers.filter(o => o.outbound.carrier === airlineFilter);
+    if (!finalOffers.length) finalOffers = allResults.slice(0,10);
+
+    allOffers = finalOffers;
+    renderAll(finalOffers, origin, dest, depIso, retIso, monthVal, daysNum, byDate);
 
   } catch(err) {
     clearInterval(iv);
@@ -676,7 +748,7 @@ function parseOffer(o, idx) {
 }
 
 // ── RENDER ───────────────────────────────────────────────────────
-function renderAll(offers, origin, dest, dep, ret, monthVal, daysNum) {
+function renderAll(offers, origin, dest, dep, ret, monthVal, daysNum, byDate) {
   const sec = document.getElementById('results');
   sec.classList.add('visible');
   setTimeout(() => sec.scrollIntoView({ behavior:'smooth' }), 80);
@@ -684,7 +756,7 @@ function renderAll(offers, origin, dest, dep, ret, monthVal, daysNum) {
   const mn = document.getElementById('month').options[document.getElementById('month').selectedIndex].text;
   document.getElementById('resTitle').textContent = `${origin} → ${dest}`;
   document.getElementById('resCount').textContent =
-    `${offers.length} voli trovati · ${dep} → ${ret} · ${daysNum} giorni · ${mn}`;
+    `${offers.length} voli · partenza ${dep} · ritorno ${ret} · ${daysNum} giorni`;
 
   if (!offers.length) {
     document.getElementById('flightsList').innerHTML = `
@@ -698,16 +770,28 @@ function renderAll(offers, origin, dest, dep, ret, monthVal, daysNum) {
   }
 
   document.getElementById('banner').style.display = 'flex';
-  renderBanner(offers);
+  renderBanner(offers, dep, ret, mn, byDate);
   renderFlights(offers);
 }
 
-function renderBanner(offers) {
+function renderBanner(offers, dep, ret, monthName, byDate) {
   const minPrice = Math.min(...offers.map(o=>o.price));
   const best     = offers.find(o=>o.price === minPrice);
-  document.getElementById('bannerTitle').textContent = `🌟 Miglior offerta trovata`;
+
+  // Calcola risparmio vs settimana più cara
+  let savingTxt = '';
+  if (byDate) {
+    const prices = Object.values(byDate).map(o => o.price);
+    if (prices.length > 1) {
+      const maxP = Math.max(...prices);
+      const diff = maxP - minPrice;
+      if (diff > 5) savingTxt = ` · Risparmi €${diff.toFixed(0)} rispetto alla settimana più cara`;
+    }
+  }
+
+  document.getElementById('bannerTitle').textContent = `🌟 Periodo migliore: ${dep} → ${ret}`;
   document.getElementById('bannerDesc').textContent  =
-    `${best.outbound.depDate} con ${airlineName(best.outbound.carrier)} · ${best.outbound.duration} andata`;
+    `${airlineName(best.outbound.carrier)} · andata ${best.outbound.duration}${savingTxt}`;
   document.getElementById('bannerPrice').textContent = `€${minPrice.toFixed(0)}`;
 }
 
@@ -828,6 +912,29 @@ function renderChart(items) {
       <div class="bar${best?' best':''}" style="height:${h}px" title="€${v.toFixed(0)}"></div>
       <div class="bar-label">${w}</div>
       <div class="bar-price">€${v.toFixed(0)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderChartFromOffers(chartData, monthVal) {
+  const container = document.getElementById('chartBars');
+  if (!chartData.length) {
+    container.innerHTML = `<div style="color:var(--muted);font-size:13px;margin:auto;">Dati non disponibili</div>`;
+    return;
+  }
+  // Ordina per data
+  chartData.sort((a,b) => a.date.localeCompare(b.date));
+  const minP = Math.min(...chartData.map(d=>d.price));
+  const maxP = Math.max(...chartData.map(d=>d.price));
+  container.innerHTML = chartData.map(({date, price}) => {
+    const h    = Math.round(((price-minP)/(maxP-minP||1))*80)+20;
+    const best = price === minP;
+    const day  = date.split(' ')[0]; // "08 ago" → "08"
+    const label = date.replace(/\d{4}/,'').trim().slice(0,6);
+    return `<div class="bar-wrap">
+      <div class="bar${best?' best':''}" style="height:${h}px" title="€${price.toFixed(0)}"></div>
+      <div class="bar-label">${label}</div>
+      <div class="bar-price">€${price.toFixed(0)}</div>
     </div>`;
   }).join('');
 }
