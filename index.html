@@ -337,6 +337,43 @@ nav {
 .loading p { color: var(--cream); font-size: 15px; font-weight: 500; }
 .loading small { color: rgba(245,240,232,.4); font-size: 12px; }
 
+
+/* ── AIRLINE FILTER PANEL ───────────────────────────── */
+.airline-filter-panel {
+  display: none; background: white; border-radius: 16px;
+  padding: 20px 24px; box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+.airline-filter-panel.visible { display: block; }
+.afp-title {
+  font-size: 13px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 14px;
+}
+.afp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.afp-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 100px;
+  border: 2px solid var(--border); background: white;
+  cursor: pointer; font-family: "DM Sans", sans-serif;
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  transition: all .2s; user-select: none;
+}
+.afp-chip:hover { border-color: var(--teal); }
+.afp-chip.excluded {
+  background: #f5f5f5; color: #aaa;
+  border-color: #e0e0e0; text-decoration: line-through;
+}
+.afp-chip .chip-price { font-size: 11px; color: var(--muted); font-weight: 500; }
+.afp-chip.excluded .chip-price { color: #ccc; }
+.afp-reset {
+  margin-left: auto; background: none; border: none;
+  color: var(--teal); font-size: 12px; font-weight: 600;
+  cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  font-family: "DM Sans", sans-serif;
+}
+.afp-reset:hover { background: rgba(26,107,107,.08); }
+
 /* Responsive */
 @media (max-width: 640px) {
   .hero { padding: 20px 20px 40px; }
@@ -488,6 +525,16 @@ nav {
   </div>
 
   <!-- Flight list -->
+
+  <!-- AIRLINE FILTER CHIPS -->
+  <div class="airline-filter-panel" id="airlineFilterPanel">
+    <div style="display:flex; align-items:center; margin-bottom:14px;">
+      <div class="afp-title">Filtra per compagnia</div>
+      <button class="afp-reset" onclick="resetAirlineFilter()">Mostra tutte</button>
+    </div>
+    <div class="afp-chips" id="airlineChips"></div>
+  </div>
+
   <div class="flights-list" id="flightsList"></div>
 
 </section>
@@ -548,40 +595,52 @@ function fmtDur(iso) {
   return `${m[1]||0}h ${pad(m[2]||0)}m`;
 }
 function fmtTime(iso) { return iso.substring(11, 16); }
-function fmtDate(iso) {
-  return new Date(iso).toLocaleDateString('it-IT', { day:'2-digit', month:'short' });
+function fmtDate(isoDate) {
+  // accetta "2025-08-01" oppure "2025-08-01T00:00:00"
+  const s = isoDate.length > 10 ? isoDate : isoDate + 'T12:00:00';
+  return new Date(s).toLocaleDateString('it-IT', { day:'2-digit', month:'short' });
 }
 function addDays(isoDate, n) {
-  const d = new Date(isoDate);
+  const d = new Date(isoDate + 'T12:00:00');
   d.setDate(d.getDate() + n);
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 
-// Restituisce le date di partenza da sondare nel mese (1, 8, 15, 22)
-function weeklyDates(monthVal) {
+// Genera tutte le finestre sliding: [dep, dep+days] per ogni giorno del mese
+// incluso il rollover: se days=7 e mese=agosto, l'ultima finestra è 31 ago → 7 set
+function slidingWindows(monthVal, daysNum) {
   const now   = new Date();
   const month = parseInt(monthVal);
   let year    = now.getFullYear();
-  if (month < now.getMonth() + 1) year++;          // mese passato → anno prossimo
+  if (month < now.getMonth() + 1) year++;
 
-  const maxDay  = new Date(year, month, 0).getDate();
-  const minDay  = (month === now.getMonth()+1 && year === now.getFullYear())
-                  ? now.getDate() + 1 : 1;
+  // Primo giorno disponibile (domani se siamo nel mese corrente, altrimenti 1°)
+  let startDay = 1;
+  if (month === now.getMonth() + 1 && year === now.getFullYear()) {
+    startDay = now.getDate() + 1;
+  }
 
-  return [1, 8, 15, 22]
-    .filter(d => d >= minDay && d <= maxDay)
-    .map(d => `${year}-${pad(month)}-${pad(d)}`);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const windows = [];
+  for (let d = startDay; d <= daysInMonth; d++) {
+    const dep = `${year}-${pad(month)}-${pad(d)}`;
+    const ret = addDays(dep, daysNum);
+    windows.push({ dep, ret, label: `${pad(d)}/${pad(month)}` });
+  }
+  return windows;
 }
 
 // ── STATO ────────────────────────────────────────────────────────
-let allOffers  = [];
-let classLabel = 'Economy';
+let allOffers        = [];   // tutti i voli del giorno migliore
+let excludedAirlines = new Set();  // codici esclusi dal filtro chip
+let classLabel       = 'Economy';
+let lastByDate       = {};   // { dep: minPrice } per il grafico
 
 // ── LOADING ──────────────────────────────────────────────────────
 function loadingOn(msg, sub) {
   document.getElementById('loading').classList.add('on');
-  document.getElementById('loadingMsg').textContent = msg;
-  document.getElementById('loadingSub').textContent = sub;
+  document.getElementById('loadingMsg').textContent = msg || 'Ricerca in corso...';
+  document.getElementById('loadingSub').textContent = sub || '';
   document.getElementById('searchBtn').disabled = true;
 }
 function loadingOff() {
@@ -590,10 +649,10 @@ function loadingOff() {
 }
 
 // ── CHIAMATA BACKEND ─────────────────────────────────────────────
-async function fetchFlights(origin, dest, dep, ret, adults, cabin, maxPrice, nonStop) {
+async function fetchFlights(origin, dest, dep, ret, adults, cabin, maxPrice, nonStop, maxResults) {
   let url = `${BACKEND}/api/flights?origin=${origin}&destination=${dest}`
     + `&departureDate=${dep}&returnDate=${ret}`
-    + `&adults=${adults}&travelClass=${cabin}&max=5`;
+    + `&adults=${adults}&travelClass=${cabin}&max=${maxResults || 3}`;
   if (maxPrice) url += `&maxPrice=${maxPrice}`;
   if (nonStop)  url += `&nonStop=true`;
   const res  = await fetch(url);
@@ -602,10 +661,10 @@ async function fetchFlights(origin, dest, dep, ret, adults, cabin, maxPrice, non
   return data.data || [];
 }
 
-// ── PARSE OFFERTA ────────────────────────────────────────────────
+// ── PARSE ────────────────────────────────────────────────────────
 function parseLeg(it) {
-  const s0   = it.segments[0];
-  const sN   = it.segments[it.segments.length - 1];
+  const s0    = it.segments[0];
+  const sN    = it.segments[it.segments.length - 1];
   const stops = it.segments.length - 1;
   return {
     carrier:  s0.carrierCode,
@@ -642,60 +701,70 @@ async function doSearch() {
   const cabin    = document.getElementById('cabin').value;
   const maxPrice = document.getElementById('maxPrice').value;
   const nonStop  = document.getElementById('nonStop').value === 'true';
-  const afilt    = document.getElementById('airline').value.trim().toUpperCase();
   classLabel = document.getElementById('cabin').options[document.getElementById('cabin').selectedIndex].text;
 
   if (!origin || !dest) { alert('Inserisci partenza e destinazione (es. FCO, JFK)'); return; }
 
-  const dates = weeklyDates(monthVal);
-  if (!dates.length) { alert('Nessuna data futura disponibile per questo mese'); return; }
+  const windows = slidingWindows(monthVal, daysNum);
+  if (!windows.length) { alert('Nessuna data futura disponibile per questo mese'); return; }
 
-  loadingOn(`Analizzo ${dates.length} settimane...`, 'Cerco il periodo più economico');
+  // Reset stato
+  excludedAirlines = new Set();
+  allOffers = [];
+  lastByDate = {};
+  document.getElementById('airlineFilterPanel').classList.remove('visible');
+  document.getElementById('results').classList.remove('visible');
+
+  loadingOn(`Analizzo ${windows.length} finestre nel mese...`, 'Cerco il periodo piu economico');
 
   try {
-    // 1 — Sonda ogni settimana del mese (5 risultati ciascuna)
-    const probes = await Promise.allSettled(
-      dates.map(dep => fetchFlights(origin, dest, dep, addDays(dep, daysNum), adults, cabin, maxPrice, nonStop))
-    );
+    // ── FASE 1: sonda ogni giorno del mese, 1 risultato ciascuno ──────────
+    // Per non fare troppe chiamate in parallelo, le batchiamo a gruppi di 5
+    const byDate = {};
+    const batchSize = 5;
 
-    // 2 — Raccogli tutti i risultati validi, uno per data (il più economico)
-    const byDate = {};   // "2025-08-01" → { price, dep }
-    probes.forEach((p, i) => {
-      if (p.status !== 'fulfilled' || !p.value.length) return;
-      const dep   = dates[i];
-      const minP  = Math.min(...p.value.map(o => parseFloat(o.price.grandTotal)));
-      byDate[dep] = minP;
-    });
+    for (let i = 0; i < windows.length; i += batchSize) {
+      const batch = windows.slice(i, i + batchSize);
+      loadingOn(
+        `Analizzo giorno ${i+1}/${windows.length}...`,
+        `Finestra ${batch[0].label} → ${addDays(batch[0].dep, daysNum).slice(8)}/${batch[0].dep.slice(5,7)}`
+      );
 
-    if (!Object.keys(byDate).length) {
-      throw new Error('Nessun volo trovato. Prova unaltra rotta o cambia mese.');
+      const probes = await Promise.allSettled(
+        batch.map(({ dep, ret }) =>
+          fetchFlights(origin, dest, dep, ret, adults, cabin, maxPrice, nonStop, 1)
+        )
+      );
+
+      probes.forEach((p, j) => {
+        if (p.status !== 'fulfilled' || !p.value.length) return;
+        const dep   = batch[j].dep;
+        const price = parseFloat(p.value[0].price.grandTotal);
+        byDate[dep] = price;
+      });
     }
 
-    // 3 — Trova la data più economica
-    const bestDep = Object.entries(byDate).sort((a, b) => a[1] - b[1])[0][0];
+    if (!Object.keys(byDate).length) {
+      throw new Error('Nessun volo trovato per questo mese. Prova un altra rotta o cambia mese.');
+    }
+
+    // ── FASE 2: trova il giorno con il prezzo minimo ──────────────────────
+    const sorted  = Object.entries(byDate).sort((a, b) => a[1] - b[1]);
+    const bestDep = sorted[0][0];
     const bestRet = addDays(bestDep, daysNum);
+    lastByDate    = byDate;
 
-    // 4 — Ricarica i voli completi per il giorno migliore (max 20)
-    loadingOn('Periodo trovato! Carico i voli...', `Partenza ${bestDep}`);
-    let bestUrl = `${BACKEND}/api/flights?origin=${origin}&destination=${dest}`
-      + `&departureDate=${bestDep}&returnDate=${bestRet}`
-      + `&adults=${adults}&travelClass=${cabin}&max=20`;
-    if (maxPrice) bestUrl += `&maxPrice=${maxPrice}`;
-    if (nonStop)  bestUrl += `&nonStop=true`;
-
-    const bestRes  = await fetch(bestUrl);
-    const bestData = await bestRes.json();
-    if (!bestRes.ok) throw new Error(bestData.error || 'Errore caricamento voli');
-
-    let offers = (bestData.data || []).map(parseOffer);
-    if (afilt) offers = offers.filter(o => o.out.carrier === afilt);
+    // ── FASE 3: carica tutti i voli per il giorno migliore ────────────────
+    loadingOn('Periodo trovato! Carico i voli...', `Partenza ${fmtDate(bestDep)}`);
+    const bestRaw = await fetchFlights(origin, dest, bestDep, bestRet, adults, cabin, maxPrice, nonStop, 20);
+    let offers = bestRaw.map(parseOffer);
     offers.sort((a, b) => a.price - b.price);
-
     allOffers = offers;
 
-    // 5 — Render
-    renderChart(byDate);
+    // ── FASE 4: render ────────────────────────────────────────────────────
+    renderChart(byDate, bestDep);
     renderBanner(byDate, bestDep, bestRet, offers);
+    renderAirlineChips(offers);
     renderResults(offers, origin, dest, bestDep, bestRet, daysNum);
 
   } catch (err) {
@@ -705,8 +774,8 @@ async function doSearch() {
   }
 }
 
-// ── RENDER GRAFICO ───────────────────────────────────────────────
-function renderChart(byDate) {
+// ── GRAFICO ──────────────────────────────────────────────────────
+function renderChart(byDate, bestDep) {
   const container = document.getElementById('chartBars');
   const entries   = Object.entries(byDate).sort((a, b) => a[0].localeCompare(b[0]));
   if (!entries.length) {
@@ -716,47 +785,93 @@ function renderChart(byDate) {
   const prices = entries.map(e => e[1]);
   const minP   = Math.min(...prices);
   const maxP   = Math.max(...prices);
+
   container.innerHTML = entries.map(([dep, price]) => {
-    const h     = Math.round(((price - minP) / (maxP - minP || 1)) * 80) + 20;
-    const isBest = price === minP;
-    const label  = fmtDate(dep + 'T00:00:00');
+    const h      = Math.round(((price - minP) / (maxP - minP || 1)) * 80) + 20;
+    const isBest = dep === bestDep;
+    const day    = dep.slice(8);   // "01"
     return `<div class="bar-wrap">
-      <div class="bar${isBest ? ' best' : ''}" style="height:${h}px" title="€${price.toFixed(0)}"></div>
-      <div class="bar-label">${label}</div>
-      <div class="bar-price">€${price.toFixed(0)}</div>
+      <div class="bar${isBest ? ' best' : ''}" style="height:${h}px" title="${fmtDate(dep)} - E${price.toFixed(0)}"></div>
+      <div class="bar-label">${day}</div>
+      <div class="bar-price">E${price.toFixed(0)}</div>
     </div>`;
   }).join('');
 }
 
-// ── RENDER BANNER ────────────────────────────────────────────────
+// ── BANNER ───────────────────────────────────────────────────────
 function renderBanner(byDate, bestDep, bestRet, offers) {
   const bestPrice = offers.length ? offers[0].price : Math.min(...Object.values(byDate));
   const prices    = Object.values(byDate);
   const worst     = Math.max(...prices);
   const saving    = worst - Math.min(...prices);
 
-  const depFmt = fmtDate(bestDep + 'T00:00:00');
-  const retFmt = fmtDate(bestRet + 'T00:00:00');
-
   document.getElementById('banner').style.display = 'flex';
   document.getElementById('bannerTitle').textContent =
-    `🌟 Periodo migliore: ${depFmt} → ${retFmt}`;
-  document.getElementById('bannerDesc').textContent  =
-    saving > 5
-      ? `Risparmi fino a €${saving.toFixed(0)} rispetto alle altre settimane del mese`
-      : `La settimana con i prezzi più bassi del mese`;
-  document.getElementById('bannerPrice').textContent = `€${bestPrice.toFixed(0)}`;
+    `Periodo migliore: ${fmtDate(bestDep)} - ${fmtDate(bestRet)}`;
+  document.getElementById('bannerDesc').textContent = saving > 5
+    ? `Risparmi fino a E${saving.toFixed(0)} rispetto al giorno piu caro del mese`
+    : 'La finestra con i prezzi piu bassi del mese';
+  document.getElementById('bannerPrice').textContent = `E${bestPrice.toFixed(0)}`;
 }
 
-// ── RENDER RISULTATI ─────────────────────────────────────────────
+// ── AIRLINE CHIPS ────────────────────────────────────────────────
+function renderAirlineChips(offers) {
+  if (!offers.length) return;
+
+  // Raggruppa per compagnia con prezzo minimo
+  const byCarrier = {};
+  offers.forEach(o => {
+    const c = o.out.carrier;
+    if (!byCarrier[c] || o.price < byCarrier[c].price) {
+      byCarrier[c] = { price: o.price, name: aName(c), emoji: aEmoji(c) };
+    }
+  });
+
+  const chips = Object.entries(byCarrier)
+    .sort((a, b) => a[1].price - b[1].price)
+    .map(([code, info]) => `
+      <div class="afp-chip" id="chip-${code}" onclick="toggleAirline('${code}')">
+        <span>${info.emoji}</span>
+        <span>${info.name}</span>
+        <span class="chip-price">da E${info.price.toFixed(0)}</span>
+      </div>
+    `).join('');
+
+  document.getElementById('airlineChips').innerHTML = chips;
+  document.getElementById('airlineFilterPanel').classList.add('visible');
+}
+
+function toggleAirline(code) {
+  if (excludedAirlines.has(code)) {
+    excludedAirlines.delete(code);
+    document.getElementById(`chip-${code}`)?.classList.remove('excluded');
+  } else {
+    excludedAirlines.add(code);
+    document.getElementById(`chip-${code}`)?.classList.add('excluded');
+  }
+  applyAirlineFilter();
+}
+
+function resetAirlineFilter() {
+  excludedAirlines.clear();
+  document.querySelectorAll('.afp-chip').forEach(c => c.classList.remove('excluded'));
+  applyAirlineFilter();
+}
+
+function applyAirlineFilter() {
+  const filtered = allOffers.filter(o => !excludedAirlines.has(o.out.carrier));
+  renderFlights(filtered);
+}
+
+// ── RISULTATI ────────────────────────────────────────────────────
 function renderResults(offers, origin, dest, dep, ret, daysNum) {
   const sec = document.getElementById('results');
   sec.classList.add('visible');
   setTimeout(() => sec.scrollIntoView({ behavior: 'smooth' }), 100);
 
-  document.getElementById('resTitle').textContent = `${origin} → ${dest}`;
+  document.getElementById('resTitle').textContent = `${origin} - ${dest}`;
   document.getElementById('resCount').textContent =
-    `${offers.length} voli · ${fmtDate(dep+'T00:00:00')} → ${fmtDate(ret+'T00:00:00')} · ${daysNum} giorni`;
+    `${offers.length} voli - ${fmtDate(dep)} - ${fmtDate(ret)} - ${daysNum} giorni`;
 
   renderFlights(offers);
 }
@@ -765,7 +880,8 @@ function renderFlights(offers) {
   const list = document.getElementById('flightsList');
   if (!offers.length) {
     list.innerHTML = `<div class="state-box"><div class="icon">🔍</div>
-      <h3>Nessun volo trovato</h3><p>Prova a cambiare filtri o rotta.</p></div>`;
+      <h3>Nessun volo trovato</h3>
+      <p>Prova a rimuovere qualche filtro o cambia compagnia.</p></div>`;
     return;
   }
   list.innerHTML = offers.map((o, i) => renderCard(o, i === 0)).join('');
@@ -773,7 +889,7 @@ function renderFlights(offers) {
 
 function renderLeg(leg, label) {
   const stopTxt = leg.stops === 0
-    ? '✓ Diretto'
+    ? 'Diretto'
     : `${leg.stops} scalo${leg.stops > 1 ? 'i' : ''} via ${leg.via}`;
   return `
     <div class="leg">
@@ -801,14 +917,14 @@ function renderLeg(leg, label) {
 function renderCard(o, isTop) {
   const c    = o.out.carrier;
   const tags = [
-    isTop                           ? { l:'🏆 Miglior prezzo', cls:'green' } : null,
-    o.out.stops === 0               ? { l:'Andata diretta',    cls:'blue'  } : null,
-    o.ret && o.ret.stops === 0      ? { l:'Ritorno diretto',   cls:'blue'  } : null,
+    isTop               ? { l:'Miglior prezzo',  cls:'green' } : null,
+    o.out.stops === 0   ? { l:'Andata diretta',  cls:'blue'  } : null,
+    o.ret && o.ret.stops === 0 ? { l:'Ritorno diretto', cls:'blue' } : null,
   ].filter(Boolean);
 
   return `
     <div class="flight-card${isTop ? ' top' : ''}">
-      ${isTop ? '<div class="top-badge">⭐ Miglior prezzo</div>' : ''}
+      ${isTop ? '<div class="top-badge">Miglior prezzo</div>' : ''}
       <div class="card-header">
         <div class="airline-info">
           <div class="airline-logo">${aEmoji(c)}</div>
@@ -822,12 +938,12 @@ function renderCard(o, isTop) {
         </div>
         <div class="price-box">
           <div class="price-label">totale a/r</div>
-          <div class="price-val">€${o.price.toFixed(0)}</div>
+          <div class="price-val">E${o.price.toFixed(0)}</div>
           <div class="price-sub">tasse incluse</div>
         </div>
       </div>
-      ${renderLeg(o.out, '✈️ Andata')}
-      ${o.ret ? renderLeg(o.ret, '🔄 Ritorno') : ''}
+      ${renderLeg(o.out, 'Andata')}
+      ${o.ret ? renderLeg(o.ret, 'Ritorno') : ''}
       ${tags.length ? `<div class="card-tags">${tags.map(t => `<span class="tag ${t.cls}">${t.l}</span>`).join('')}</div>` : ''}
     </div>`;
 }
@@ -836,8 +952,9 @@ function renderCard(o, isTop) {
 function doSort(by, btn) {
   document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  if (!allOffers.length) return;
-  const s = [...allOffers];
+  const visible = allOffers.filter(o => !excludedAirlines.has(o.out.carrier));
+  if (!visible.length) return;
+  const s = [...visible];
   if (by === 'price')    s.sort((a, b) => a.price - b.price);
   if (by === 'duration') s.sort((a, b) => a.out.durRaw.localeCompare(b.out.durRaw));
   if (by === 'stops')    s.sort((a, b) => a.out.stops - b.out.stops);
@@ -855,6 +972,7 @@ function showError(msg) {
   const sec = document.getElementById('results');
   sec.classList.add('visible');
   document.getElementById('banner').style.display = 'none';
+  document.getElementById('airlineFilterPanel').classList.remove('visible');
   document.getElementById('flightsList').innerHTML = `
     <div class="state-box err">
       <div class="icon">⚠️</div>
@@ -864,5 +982,6 @@ function showError(msg) {
   setTimeout(() => sec.scrollIntoView({ behavior: 'smooth' }), 100);
 }
 </script>
+
 </body>
 </html>
