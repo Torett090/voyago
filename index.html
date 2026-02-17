@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voyago — Cerca Voli</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:        #0d0d0d;
+  --cream:      #f5f0e8;
+  --gold:       #c9a84c;
+  --gold-light: #e8c97a;
+  --teal:       #1a6b6b;
+  --teal-light: #2a9090;
+  --border:     #e0d8cc;
+  --muted:      #7a7060;
+  --shadow:     0 4px 24px rgba(0,0,0,0.08);
+  --shadow-lg:  0 12px 48px rgba(0,0,0,0.14);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+/* ── HERO ─────────────────────────────────────────────── */
+.hero {
+  background: var(--ink);
+  background-image:
+    radial-gradient(ellipse 70% 60% at 75% 40%, rgba(201,168,76,.18) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 70% at 15% 80%, rgba(26,107,107,.18) 0%, transparent 65%);
+  padding: 28px 48px 56px;
+}
+
+nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 52px;
+}
+.logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 26px; font-weight: 900;
+  color: var(--cream); letter-spacing: -.5px;
+}
+.logo span { color: var(--gold); }
+
+.hero-text { text-align: center; margin-bottom: 44px; }
+.hero-text h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(40px, 6vw, 76px);
+  font-weight: 900; line-height: .95;
+  color: var(--cream); margin-bottom: 14px;
+}
+.hero-text h1 em { font-style: italic; color: var(--gold); display: block; }
+.hero-text p { color: rgba(245,240,232,.5); font-size: 16px; }
+
+/* ── SEARCH CARD ──────────────────────────────────────── */
+.search-card {
+  background: rgba(255,255,255,.08);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 22px;
+  padding: 36px;
+  max-width: 860px; margin: 0 auto;
+}
+
+.search-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.search-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+.search-grid.four  { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  color: rgba(245,240,232,.4);
+}
+.field input, .field select {
+  background: rgba(255,255,255,.09);
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 11px; padding: 13px 16px;
+  color: var(--cream); font-family: 'DM Sans', sans-serif;
+  font-size: 14px; font-weight: 500;
+  outline: none; width: 100%;
+  transition: border-color .2s, background .2s;
+}
+.field input::placeholder { color: rgba(245,240,232,.25); }
+.field input:focus, .field select:focus {
+  border-color: var(--gold);
+  background: rgba(201,168,76,.09);
+  box-shadow: 0 0 0 3px rgba(201,168,76,.1);
+}
+.field select option { background: #1a1a1a; }
+
+/* Filtri avanzati toggle */
+.filters-toggle {
+  background: none; border: none;
+  color: rgba(245,240,232,.4); cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 500;
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 0; transition: color .2s;
+  margin-bottom: 0;
+}
+.filters-toggle:hover { color: var(--gold-light); }
+.filters-toggle .arrow { transition: transform .3s; display: inline-block; }
+.filters-toggle.open .arrow { transform: rotate(180deg); }
+
+.filters-extra {
+  display: none; padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  margin-top: 16px;
+}
+.filters-extra.open { display: block; }
+
+.search-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 24px; padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+.search-footer .hint { font-size: 12px; color: rgba(245,240,232,.3); }
+
+.btn-search {
+  background: linear-gradient(135deg, var(--gold), var(--gold-light));
+  border: none; border-radius: 12px;
+  padding: 14px 40px; cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px; font-weight: 700; color: var(--ink);
+  transition: transform .2s, box-shadow .2s;
+  box-shadow: 0 6px 24px rgba(201,168,76,.35);
+}
+.btn-search:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(201,168,76,.5); }
+.btn-search:active { transform: translateY(0); }
+.btn-search:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* ── RESULTS ──────────────────────────────────────────── */
+.results { max-width: 900px; margin: 0 auto; padding: 56px 24px 80px; display: none; }
+.results.visible { display: block; }
+
+/* Best period banner */
+.banner {
+  background: linear-gradient(135deg, var(--teal), var(--teal-light));
+  border-radius: 18px; padding: 28px 36px;
+  color: white; display: flex; align-items: center; gap: 24px;
+  margin-bottom: 32px;
+  box-shadow: 0 6px 32px rgba(26,107,107,.25);
+}
+.banner-icon { font-size: 44px; flex-shrink: 0; }
+.banner-text h3 { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.banner-text p  { font-size: 13px; opacity: .85; line-height: 1.5; }
+.banner-price   { margin-left: auto; text-align: right; flex-shrink: 0; }
+.banner-price .from { font-size: 11px; opacity: .65; }
+.banner-price .val  { font-family: 'Playfair Display', serif; font-size: 34px; font-weight: 900; }
+
+/* Sort bar */
+.results-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px;
+}
+.results-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 900; }
+.results-count { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+.sort-bar { display: flex; gap: 6px; }
+.sort-btn {
+  padding: 7px 16px; border-radius: 8px;
+  border: 1px solid var(--border); background: white;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  transition: all .2s;
+}
+.sort-btn.active, .sort-btn:hover {
+  background: var(--teal); color: white; border-color: var(--teal);
+}
+
+/* Price chart */
+.chart-card {
+  background: white; border-radius: 18px;
+  padding: 28px; box-shadow: var(--shadow);
+  margin-bottom: 32px;
+}
+.chart-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+.chart-bars  { display: flex; align-items: flex-end; gap: 8px; height: 110px; }
+.bar-wrap    { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bar {
+  width: 100%; border-radius: 5px 5px 0 0;
+  background: linear-gradient(to top, var(--teal), var(--teal-light));
+  transition: height .5s ease; cursor: pointer;
+}
+.bar.best { background: linear-gradient(to top, var(--gold), var(--gold-light)); box-shadow: 0 3px 14px rgba(201,168,76,.35); }
+.bar:hover { opacity: .8; }
+.bar-label { font-size: 10px; color: var(--muted); font-weight: 600; }
+.bar-price { font-size: 9px; color: var(--muted); }
+
+/* Flight cards */
+.flights-list { display: flex; flex-direction: column; gap: 16px; }
+
+.flight-card {
+  background: white; border-radius: 18px;
+  padding: 24px 28px; box-shadow: var(--shadow);
+  border: 2px solid transparent;
+  transition: transform .25s, box-shadow .25s, border-color .25s;
+  position: relative; overflow: hidden;
+}
+.flight-card::before {
+  content: ''; position: absolute;
+  left: 0; top: 0; bottom: 0; width: 4px;
+  background: linear-gradient(to bottom, var(--gold), transparent);
+  opacity: 0; transition: opacity .3s;
+}
+.flight-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.flight-card:hover::before { opacity: 1; }
+.flight-card.top { border-color: var(--gold); background: linear-gradient(135deg,#fffdf5,#fff9e8); }
+.flight-card.top::before { opacity: 1; }
+
+.top-badge {
+  position: absolute; top: 16px; right: 16px;
+  background: var(--gold); color: var(--ink);
+  font-size: 10px; font-weight: 800; letter-spacing: .8px;
+  text-transform: uppercase; padding: 4px 12px; border-radius: 100px;
+}
+
+/* Card header */
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+
+.airline-info { display: flex; align-items: center; gap: 10px; }
+.airline-logo {
+  width: 38px; height: 38px; border-radius: 9px;
+  background: var(--cream); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.airline-name { font-weight: 700; font-size: 15px; }
+.airline-meta { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.iata-badge {
+  background: var(--ink); color: white;
+  font-size: 9px; font-weight: 800; letter-spacing: .6px;
+  padding: 2px 6px; border-radius: 4px;
+}
+.class-txt { font-size: 12px; color: var(--muted); }
+
+.price-box { text-align: right; }
+.price-label { font-size: 11px; color: var(--muted); }
+.price-val {
+  font-family: 'Playfair Display', serif;
+  font-size: 30px; font-weight: 900; line-height: 1;
+}
+.price-sub { font-size: 11px; color: var(--muted); }
+
+/* Leg */
+.leg { margin-bottom: 0; }
+.leg + .leg { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
+
+.leg-header {
+  font-size: 10px; font-weight: 800; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--teal);
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 8px;
+}
+.flight-num {
+  background: rgba(26,107,107,.1); color: var(--teal);
+  font-size: 9px; font-weight: 700; letter-spacing: .4px;
+  padding: 2px 7px; border-radius: 4px; text-transform: none;
+}
+
+.route {
+  display: flex; align-items: center;
+  background: var(--cream); border-radius: 12px;
+  padding: 14px 20px;
+}
+.route-pt { text-align: center; min-width: 72px; }
+.route-time {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px; font-weight: 700; line-height: 1;
+}
+.route-iata { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .4px; margin-top: 3px; }
+.route-date { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+.route-mid { flex: 1; text-align: center; padding: 0 12px; }
+.route-line {
+  height: 2px;
+  background: linear-gradient(to right, var(--border), var(--teal), var(--border));
+  margin-bottom: 6px; position: relative;
+}
+.route-line::after {
+  content: '✈'; position: absolute; top: -9px; left: 50%;
+  transform: translateX(-50%);
+  color: var(--teal); font-size: 16px;
+  background: var(--cream); padding: 0 5px;
+}
+.route-dur  { font-size: 11px; font-weight: 600; color: var(--teal); margin-bottom: 2px; }
+.route-stop { font-size: 10px; color: var(--muted); }
+.route-stop.direct { color: #2a8a5a; font-weight: 600; }
+
+/* Tags */
+.card-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
+.tag {
+  padding: 3px 10px; border-radius: 100px;
+  font-size: 10px; font-weight: 600;
+  background: var(--cream); color: var(--muted); border: 1px solid var(--border);
+}
+.tag.green { background: #e6f8ef; color: #1a7a4a; border-color: #b0ddc0; }
+.tag.blue  { background: #e6eef8; color: #1a4a7a; border-color: #b0c8e0; }
+
+/* Error / empty state */
+.state-box {
+  text-align: center; padding: 60px 20px;
+  background: white; border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+.state-box .icon { font-size: 48px; margin-bottom: 16px; }
+.state-box h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+.state-box p  { font-size: 14px; color: var(--muted); }
+.state-box.err h3 { color: #c45c3a; }
+
+/* Loading overlay */
+.loading {
+  display: none; position: fixed; inset: 0;
+  background: rgba(13,13,13,.82);
+  z-index: 200; align-items: center; justify-content: center;
+  flex-direction: column; gap: 18px;
+}
+.loading.on { display: flex; }
+.spinner {
+  width: 52px; height: 52px;
+  border: 3px solid rgba(201,168,76,.2);
+  border-top-color: var(--gold);
+  border-radius: 50%; animation: spin .75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading p { color: var(--cream); font-size: 15px; font-weight: 500; }
+.loading small { color: rgba(245,240,232,.4); font-size: 12px; }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .hero { padding: 20px 20px 40px; }
+  .search-card { padding: 22px; }
+  .search-grid, .search-grid.three, .search-grid.four { grid-template-columns: 1fr; }
+  .results { padding: 32px 16px 60px; }
+  .banner { flex-direction: column; text-align: center; }
+  .banner-price { margin-left: 0; }
+  .results-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── HERO ──────────────────────────────────────────────────── -->
+<section class="hero">
+  <nav>
+    <div class="logo">Voy<span>ago</span></div>
+    <span style="color:rgba(245,240,232,.3);font-size:12px;">✦ Powered by Amadeus</span>
+  </nav>
+
+  <div class="hero-text">
+    <h1>Trova il volo<br><em>più conveniente.</em></h1>
+    <p>Inserisci la rotta e ti diciamo qual è il periodo migliore del mese.</p>
+  </div>
+
+  <!-- SEARCH CARD -->
+  <div class="search-card">
+    <!-- Riga 1: rotte -->
+    <div class="search-grid">
+      <div class="field">
+        <label>Partenza</label>
+        <input id="origin" type="text" placeholder="es. FCO — Roma Fiumicino" value="FCO">
+      </div>
+      <div class="field">
+        <label>Destinazione</label>
+        <input id="dest" type="text" placeholder="es. JFK — New York" value="JFK">
+      </div>
+    </div>
+
+    <!-- Riga 2: date + passeggeri -->
+    <div class="search-grid four">
+      <div class="field">
+        <label>Mese</label>
+        <select id="month">
+          <option value="01">Gennaio</option>
+          <option value="02">Febbraio</option>
+          <option value="03">Marzo</option>
+          <option value="04">Aprile</option>
+          <option value="05">Maggio</option>
+          <option value="06">Giugno</option>
+          <option value="07">Luglio</option>
+          <option value="08" selected>Agosto</option>
+          <option value="09">Settembre</option>
+          <option value="10">Ottobre</option>
+          <option value="11">Novembre</option>
+          <option value="12">Dicembre</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Durata (giorni)</label>
+        <input id="days" type="number" min="1" max="90" value="7">
+      </div>
+      <div class="field">
+        <label>Passeggeri</label>
+        <select id="adults">
+          <option value="1">1 adulto</option>
+          <option value="2">2 adulti</option>
+          <option value="3">3 adulti</option>
+          <option value="4">4 adulti</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Classe</label>
+        <select id="cabin">
+          <option value="ECONOMY">Economy</option>
+          <option value="PREMIUM_ECONOMY">Premium Economy</option>
+          <option value="BUSINESS">Business</option>
+          <option value="FIRST">First Class</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Filtri avanzati -->
+    <button class="filters-toggle" id="ftoggle" onclick="toggleFilters()">
+      ⚙️ Filtri avanzati <span class="arrow">▾</span>
+    </button>
+
+    <div class="filters-extra" id="filters-extra">
+      <div class="search-grid three" style="margin-top:0;">
+        <div class="field">
+          <label>Prezzo max (€)</label>
+          <input id="maxPrice" type="number" placeholder="es. 900">
+        </div>
+        <div class="field">
+          <label>Scali</label>
+          <select id="nonStop">
+            <option value="">Qualsiasi</option>
+            <option value="true">Solo diretto</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Compagnia</label>
+          <input id="airline" type="text" placeholder="es. AZ, BA, LH">
+        </div>
+      </div>
+    </div>
+
+    <div class="search-footer">
+      <span class="hint">Inserisci il codice IATA (3 lettere)</span>
+      <button class="btn-search" id="searchBtn" onclick="doSearch()">✈ Cerca voli</button>
+    </div>
+  </div>
+</section>
+
+<!-- ── RESULTS ────────────────────────────────────────────────── -->
+<section class="results" id="results">
+
+  <!-- Best period banner -->
+  <div class="banner" id="banner">
+    <div class="banner-icon">📅</div>
+    <div class="banner-text">
+      <h3 id="bannerTitle">Periodo migliore</h3>
+      <p  id="bannerDesc"></p>
+    </div>
+    <div class="banner-price">
+      <div class="from">da</div>
+      <div class="val" id="bannerPrice"></div>
+    </div>
+  </div>
+
+  <!-- Price chart -->
+  <div class="chart-card">
+    <div class="chart-title">📊 Prezzi nel mese — settimana per settimana</div>
+    <div class="chart-bars" id="chartBars"></div>
+  </div>
+
+  <!-- Results header + sort -->
+  <div class="results-header">
+    <div>
+      <div class="results-title" id="resTitle">Voli trovati</div>
+      <div class="results-count" id="resCount"></div>
+    </div>
+    <div class="sort-bar">
+      <button class="sort-btn active" onclick="doSort('price',this)">💶 Prezzo</button>
+      <button class="sort-btn" onclick="doSort('duration',this)">⏱ Durata</button>
+      <button class="sort-btn" onclick="doSort('stops',this)">🔁 Scali</button>
+    </div>
+  </div>
+
+  <!-- Flight list -->
+  <div class="flights-list" id="flightsList"></div>
+
+</section>
+
+<!-- LOADING -->
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <p id="loadingMsg">Connessione ad Amadeus...</p>
+  <small id="loadingSub">Ricerca voli in corso</small>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────
+// Sostituisci con l'URL del tuo backend su Render dopo il deploy
+const BACKEND = 'https://voyago-api.onrender.com';
+
+// ── DATI ────────────────────────────────────────────────────────
+const AIRLINES = {
+  AC:'Air Canada',AF:'Air France',AY:'Finnair',AZ:'ITA Airways',
+  AA:'American Airlines',AM:'Aeromexico',AV:'Avianca',
+  AT:'Royal Air Maroc',B6:'JetBlue',BA:'British Airways',
+  BT:'airBaltic',CA:'Air China',CI:'China Airlines',
+  CM:'Copa Airlines',CX:'Cathay Pacific',CZ:'China Southern',
+  DL:'Delta Air Lines',EI:'Aer Lingus',EK:'Emirates',
+  ET:'Ethiopian Airlines',EW:'Eurowings',EY:'Etihad',
+  F9:'Frontier Airlines',FI:'Icelandair',FR:'Ryanair',
+  FZ:'flydubai',GA:'Garuda Indonesia',GF:'Gulf Air',
+  HA:'Hawaiian Airlines',HV:'Transavia',IB:'Iberia',
+  JL:'Japan Airlines',JQ:'Jetstar',JU:'Air Serbia',
+  KE:'Korean Air',KL:'KLM',KQ:'Kenya Airways',
+  LA:'LATAM',LH:'Lufthansa',LO:'LOT Polish Airlines',
+  LX:'Swiss Int. Air Lines',LY:'El Al',MH:'Malaysia Airlines',
+  MS:'EgyptAir',MU:'China Eastern',NH:'ANA All Nippon',
+  NK:'Spirit Airlines',NZ:'Air New Zealand',OK:'Czech Airlines',
+  OS:'Austrian Airlines',OZ:'Asiana Airlines',
+  PC:'Pegasus Airlines',PR:'Philippine Airlines',
+  QF:'Qantas',QR:'Qatar Airways',RJ:'Royal Jordanian',
+  S7:'S7 Airlines',SA:'South African Airways',
+  SK:'Scandinavian Airlines',SN:'Brussels Airlines',
+  SQ:'Singapore Airlines',SU:'Aeroflot',SV:'Saudia',
+  TG:'Thai Airways',TK:'Turkish Airlines',TP:'TAP Air Portugal',
+  U2:'easyJet',UA:'United Airlines',UX:'Air Europa',
+  VN:'Vietnam Airlines',VS:'Virgin Atlantic',VY:'Vueling',
+  W6:'Wizz Air',WN:'Southwest Airlines',WS:'WestJet',
+};
+const EMOJIS = {
+  AZ:'🇮🇹',AA:'🇺🇸',DL:'🔷',BA:'🇬🇧',UA:'🌐',LH:'🇩🇪',
+  AF:'🇫🇷',KL:'🇳🇱',IB:'🇪🇸',EK:'🇦🇪',TK:'🇹🇷',QR:'🇶🇦',
+  AC:'🇨🇦',SK:'🇸🇪',SQ:'🇸🇬',NH:'🇯🇵',CX:'🇭🇰',EI:'🇮🇪',
+  TP:'🇵🇹',OS:'🇦🇹',LX:'🇨🇭',EY:'🇦🇪',VY:'🟠',FR:'🟡',
+  U2:'🟠',W6:'🟣',B6:'🔵',F9:'🟢',NK:'💛',WN:'❤️',
+};
+
+function airlineName(code) { return AIRLINES[code] || `Compagnia ${code}`; }
+function airlineEmoji(code) { return EMOJIS[code] || '✈️'; }
+
+// ── UTILS ────────────────────────────────────────────────────────
+function fmtDuration(iso) {
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
+  return `${m[1]||0}h ${(m[2]||'0').padStart(2,'0')}m`;
+}
+function fmtDate(iso) {
+  // iso = "2025-08-08T09:30:00"
+  const d = new Date(iso);
+  return d.toLocaleDateString('it-IT',{day:'2-digit',month:'short'});
+}
+function fmtTime(iso) { return iso.substring(11,16); }
+
+function buildDates(monthVal, daysNum) {
+  const year = new Date().getFullYear();
+  const pad  = n => String(n).padStart(2,'0');
+  // Usa l'8 del mese come data partenza
+  let depYear = year;
+  const depMonth = parseInt(monthVal);
+  // Se il mese è passato, prendi il prossimo anno
+  const now = new Date();
+  if (depMonth < now.getMonth() + 1) depYear = year + 1;
+  const dep = `${depYear}-${pad(depMonth)}-08`;
+  const retDate = new Date(depYear, depMonth - 1, 8 + parseInt(daysNum));
+  const ret = `${retDate.getFullYear()}-${pad(retDate.getMonth()+1)}-${pad(retDate.getDate())}`;
+  return { dep, ret };
+}
+
+function parseItinerary(it) {
+  const first = it.segments[0];
+  const last  = it.segments[it.segments.length - 1];
+  const stops = it.segments.length - 1;
+  const via   = stops > 0 ? it.segments.slice(0,-1).map(s=>s.arrival.iataCode).join(', ') : '';
+  return {
+    carrier:   first.carrierCode,
+    flightNum: `${first.carrierCode}${first.number||''}`,
+    depTime:   fmtTime(first.departure.at),
+    depDate:   fmtDate(first.departure.at),
+    depCode:   first.departure.iataCode,
+    arrTime:   fmtTime(last.arrival.at),
+    arrDate:   fmtDate(last.arrival.at),
+    arrCode:   last.arrival.iataCode,
+    duration:  fmtDuration(it.duration),
+    durationRaw: it.duration,
+    stops, via,
+  };
+}
+
+// ── STATE ────────────────────────────────────────────────────────
+let allOffers = [];
+let classLabel = 'Economy';
+
+// ── SEARCH ──────────────────────────────────────────────────────
+const msgs = [
+  ['Connessione ad Amadeus...','Autenticazione in corso'],
+  ['Ricerca voli...','Controllando disponibilità e prezzi'],
+  ['Analisi prezzi mensili...','Trovando il periodo più economico'],
+  ['Quasi pronto!','Ordino i risultati per te'],
+];
+
+async function doSearch() {
+  const origin   = document.getElementById('origin').value.trim().toUpperCase().slice(0,3);
+  const dest     = document.getElementById('dest').value.trim().toUpperCase().slice(0,3);
+  const monthVal = document.getElementById('month').value;
+  const daysNum  = document.getElementById('days').value || 7;
+  const adults   = document.getElementById('adults').value;
+  const cabin    = document.getElementById('cabin').value;
+  const maxPrice = document.getElementById('maxPrice').value;
+  const nonStop  = document.getElementById('nonStop').value;
+  const airlineFilter = document.getElementById('airline').value.trim().toUpperCase();
+
+  classLabel = document.getElementById('cabin').options[document.getElementById('cabin').selectedIndex].text;
+
+  if (!origin || !dest) { alert('Inserisci partenza e destinazione (es. FCO, JFK)'); return; }
+
+  const { dep, ret } = buildDates(monthVal, daysNum);
+
+  // Loading
+  const loading = document.getElementById('loading');
+  loading.classList.add('on');
+  document.getElementById('searchBtn').disabled = true;
+  let step = 0;
+  const iv = setInterval(() => {
+    step = (step+1) % msgs.length;
+    document.getElementById('loadingMsg').textContent  = msgs[step][0];
+    document.getElementById('loadingSub').textContent  = msgs[step][1];
+  }, 900);
+
+  try {
+    // Chiama il backend proxy
+    let url = `${BACKEND}/api/flights?origin=${origin}&destination=${dest}`
+      + `&departureDate=${dep}&returnDate=${ret}`
+      + `&adults=${adults}&travelClass=${cabin}&max=20`;
+    if (maxPrice) url += `&maxPrice=${maxPrice}`;
+    if (nonStop)  url += `&nonStop=${nonStop}`;
+
+    const res  = await fetch(url);
+    const data = await res.json();
+    clearInterval(iv);
+
+    if (!res.ok || data.error) throw new Error(data.error || 'Nessun volo trovato');
+
+    let offers = (data.data || []).map((o,i) => parseOffer(o,i));
+
+    // Filtro compagnia client-side
+    if (airlineFilter) {
+      offers = offers.filter(o => o.outbound.carrier === airlineFilter ||
+                                   o.ret?.carrier === airlineFilter);
+    }
+
+    allOffers = offers;
+    renderAll(offers, origin, dest, dep, ret, monthVal, daysNum);
+
+    // Prova a caricare prezzi mensili
+    fetchMonthlyPrices(origin, dest, monthVal);
+
+  } catch(err) {
+    clearInterval(iv);
+    showError(err.message);
+  } finally {
+    loading.classList.remove('on');
+    document.getElementById('searchBtn').disabled = false;
+  }
+}
+
+function parseOffer(o, idx) {
+  const outbound = parseItinerary(o.itineraries[0]);
+  const ret      = o.itineraries[1] ? parseItinerary(o.itineraries[1]) : null;
+  const price    = parseFloat(o.price.grandTotal);
+  return { raw: o, outbound, ret, price, idx };
+}
+
+// ── RENDER ───────────────────────────────────────────────────────
+function renderAll(offers, origin, dest, dep, ret, monthVal, daysNum) {
+  const sec = document.getElementById('results');
+  sec.classList.add('visible');
+  setTimeout(() => sec.scrollIntoView({ behavior:'smooth' }), 80);
+
+  const mn = document.getElementById('month').options[document.getElementById('month').selectedIndex].text;
+  document.getElementById('resTitle').textContent = `${origin} → ${dest}`;
+  document.getElementById('resCount').textContent =
+    `${offers.length} voli trovati · ${dep} → ${ret} · ${daysNum} giorni · ${mn}`;
+
+  if (!offers.length) {
+    document.getElementById('flightsList').innerHTML = `
+      <div class="state-box">
+        <div class="icon">🔍</div>
+        <h3>Nessun volo trovato</h3>
+        <p>Prova con altri filtri, date o una rotta diversa.</p>
+      </div>`;
+    document.getElementById('banner').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('banner').style.display = 'flex';
+  renderBanner(offers);
+  renderFlights(offers);
+}
+
+function renderBanner(offers) {
+  const minPrice = Math.min(...offers.map(o=>o.price));
+  const best     = offers.find(o=>o.price === minPrice);
+  document.getElementById('bannerTitle').textContent = `🌟 Miglior offerta trovata`;
+  document.getElementById('bannerDesc').textContent  =
+    `${best.outbound.depDate} con ${airlineName(best.outbound.carrier)} · ${best.outbound.duration} andata`;
+  document.getElementById('bannerPrice').textContent = `€${minPrice.toFixed(0)}`;
+}
+
+function renderFlights(offers) {
+  const list = document.getElementById('flightsList');
+  if (!offers.length) {
+    list.innerHTML = `<div class="state-box"><div class="icon">🔍</div><h3>Nessun risultato</h3><p>Cambia i filtri e riprova.</p></div>`;
+    return;
+  }
+  list.innerHTML = offers.map((o,i) => renderCard(o, i===0)).join('');
+}
+
+function renderLeg(leg, label) {
+  const stopTxt = leg.stops === 0
+    ? '✓ Diretto'
+    : `${leg.stops} scalo${leg.stops>1?'i':''} via ${leg.via}`;
+  return `
+    <div class="leg">
+      <div class="leg-header">
+        ${label}
+        <span class="flight-num">${leg.flightNum}</span>
+      </div>
+      <div class="route">
+        <div class="route-pt">
+          <div class="route-time">${leg.depTime}</div>
+          <div class="route-iata">${leg.depCode}</div>
+          <div class="route-date">${leg.depDate}</div>
+        </div>
+        <div class="route-mid">
+          <div class="route-line"></div>
+          <div class="route-dur">${leg.duration}</div>
+          <div class="route-stop${leg.stops===0?' direct':''}">${stopTxt}</div>
+        </div>
+        <div class="route-pt">
+          <div class="route-time">${leg.arrTime}</div>
+          <div class="route-iata">${leg.arrCode}</div>
+          <div class="route-date">${leg.arrDate}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderCard(o, isTop) {
+  const carrier = o.outbound.carrier;
+  const tags = [
+    isTop ? { label:'🏆 Miglior prezzo', cls:'green' } : null,
+    o.outbound.stops===0 ? { label:'Andata diretta', cls:'blue' } : null,
+    o.ret && o.ret.stops===0 ? { label:'Ritorno diretto', cls:'blue' } : null,
+  ].filter(Boolean);
+
+  return `
+    <div class="flight-card${isTop?' top':''}">
+      ${isTop ? '<div class="top-badge">⭐ Miglior prezzo</div>' : ''}
+      <div class="card-header">
+        <div class="airline-info">
+          <div class="airline-logo">${airlineEmoji(carrier)}</div>
+          <div>
+            <div class="airline-name">${airlineName(carrier)}</div>
+            <div class="airline-meta">
+              <span class="iata-badge">${carrier}</span>
+              <span class="class-txt">${classLabel}</span>
+            </div>
+          </div>
+        </div>
+        <div class="price-box">
+          <div class="price-label">totale a/r</div>
+          <div class="price-val">€${o.price.toFixed(0)}</div>
+          <div class="price-sub">tasse incluse</div>
+        </div>
+      </div>
+
+      ${renderLeg(o.outbound, '✈️ Andata')}
+      ${o.ret ? renderLeg(o.ret, '🔄 Ritorno') : ''}
+
+      ${tags.length ? `<div class="card-tags">${tags.map(t=>`<span class="tag ${t.cls}">${t.label}</span>`).join('')}</div>` : ''}
+    </div>`;
+}
+
+// ── MONTHLY PRICES ────────────────────────────────────────────────
+async function fetchMonthlyPrices(origin, dest, monthVal) {
+  try {
+    const year = new Date().getFullYear();
+    const url  = `${BACKEND}/api/flight-dates?origin=${origin}&destination=${dest}`
+      + `&departureDate=${year}-${monthVal}-01,${year}-${monthVal}-28`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    renderChart(data.data || []);
+    if (data.data && data.data.length) updateBannerFromMonthly(data.data);
+  } catch { renderChart([]); }
+}
+
+function renderChart(items) {
+  const container = document.getElementById('chartBars');
+  if (!items.length) {
+    container.innerHTML = `<div style="color:var(--muted);font-size:13px;margin:auto;text-align:center;">
+      Dati storici non disponibili per questa rotta</div>`;
+    return;
+  }
+  const byWeek = {};
+  items.forEach(item => {
+    const day  = parseInt((item.departureDate||'').split('-')[2]||0);
+    const week = day<=7?'1–7':day<=14?'8–14':day<=21?'15–21':day<=28?'22–28':'29+';
+    const p    = parseFloat(item.price?.total||0);
+    if (!byWeek[week] || p < byWeek[week]) byWeek[week] = p;
+  });
+  const weeks = ['1–7','8–14','15–21','22–28','29+'];
+  const vals  = weeks.map(w => byWeek[w]||null);
+  const valid = vals.filter(Boolean);
+  if (!valid.length) { container.innerHTML = `<div style="color:var(--muted);font-size:13px;margin:auto;">Dati non disponibili</div>`; return; }
+  const maxV = Math.max(...valid);
+  const minV = Math.min(...valid);
+  container.innerHTML = weeks.map((w,i) => {
+    const v = vals[i];
+    if (!v) return `<div class="bar-wrap"><div class="bar" style="height:4px;opacity:.15"></div><div class="bar-label">${w}</div><div class="bar-price">—</div></div>`;
+    const h    = Math.round(((v-minV)/(maxV-minV||1))*80)+20;
+    const best = v === minV;
+    return `<div class="bar-wrap">
+      <div class="bar${best?' best':''}" style="height:${h}px" title="€${v.toFixed(0)}"></div>
+      <div class="bar-label">${w}</div>
+      <div class="bar-price">€${v.toFixed(0)}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateBannerFromMonthly(items) {
+  const byWeek = {};
+  items.forEach(item => {
+    const day  = parseInt((item.departureDate||'').split('-')[2]||0);
+    const week = day<=7?'1–7':day<=14?'8–14':day<=21?'15–21':day<=28?'22–28':'29+';
+    const p    = parseFloat(item.price?.total||0);
+    if (!byWeek[week] || p < byWeek[week]) byWeek[week] = p;
+  });
+  const sorted = Object.entries(byWeek).sort((a,b)=>a[1]-b[1]);
+  if (!sorted.length) return;
+  const [bestWeek, bestP] = sorted[0];
+  const diff = sorted.length>1 ? sorted[sorted.length-1][1]-sorted[0][1] : 0;
+  document.getElementById('bannerTitle').textContent = `🌟 Settimana più economica: ${bestWeek} del mese`;
+  document.getElementById('bannerDesc').textContent  =
+    `Prezzi da €${bestP.toFixed(0)} · Risparmio fino a €${diff.toFixed(0)} rispetto alla settimana più cara.`;
+  document.getElementById('bannerPrice').textContent = `€${bestP.toFixed(0)}`;
+}
+
+// ── SORT ─────────────────────────────────────────────────────────
+function doSort(by, btn) {
+  document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if (!allOffers.length) return;
+  const sorted = [...allOffers];
+  if (by==='price')    sorted.sort((a,b)=>a.price-b.price);
+  if (by==='duration') sorted.sort((a,b)=>a.outbound.durationRaw.localeCompare(b.outbound.durationRaw));
+  if (by==='stops')    sorted.sort((a,b)=>a.outbound.stops-b.outbound.stops);
+  renderFlights(sorted);
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────
+function toggleFilters() {
+  const el  = document.getElementById('filters-extra');
+  const btn = document.getElementById('ftoggle');
+  el.classList.toggle('open');
+  btn.classList.toggle('open');
+}
+
+function showError(msg) {
+  const sec = document.getElementById('results');
+  sec.classList.add('visible');
+  document.getElementById('banner').style.display='none';
+  document.getElementById('chartBars').parentElement.style.display='none';
+  document.getElementById('flightsList').innerHTML = `
+    <div class="state-box err">
+      <div class="icon">⚠️</div>
+      <h3>Errore nella ricerca</h3>
+      <p>${msg}</p>
+    </div>`;
+  setTimeout(()=>sec.scrollIntoView({behavior:'smooth'}),80);
+}
+</script>
+</body>
+</html>
