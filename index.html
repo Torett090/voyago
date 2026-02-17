@@ -817,13 +817,21 @@ function parseOffer(raw) {
   const ret   = raw.itineraries[1] ? parseLeg(raw.itineraries[1]) : null;
   const price = parseFloat(raw.price.grandTotal);
 
-  // Scarta offerte con compagnia sconosciuta (codici fittizi tipo A1, X1)
-  if (!AIRLINES[out.carrier]) return null;
-
   return { raw, out, ret, price };
 }
 
 // ── RICERCA ──────────────────────────────────────────────────────
+// ── WAKE UP BACKEND ─────────────────────────────────────────────
+async function wakeUpBackend() {
+  try {
+    loadingOn('Avvio il server...', 'Prima richiesta - potrebbe richiedere 20-30 secondi');
+    const res = await fetch(`${BACKEND}/`, { signal: AbortSignal.timeout(35000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function doSearch() {
   const origin = document.getElementById('origin').value.trim().toUpperCase().slice(0, 3);
   const dest   = document.getElementById('dest').value.trim().toUpperCase().slice(0, 3);
@@ -836,6 +844,9 @@ async function doSearch() {
   allOffers = [];
   document.getElementById('airlineFilterPanel').classList.remove('visible');
   document.getElementById('results').classList.remove('visible');
+
+  // Sveglia il backend se addormentato (Render free tier)
+  await wakeUpBackend();
 
   if (currentDateMode === 'exact') {
     await searchExact(origin, dest, maxPrice, nonStop);
@@ -908,11 +919,7 @@ async function searchByMonth(origin, dest, maxPrice, nonStop) {
       );
       probes.forEach((p, j) => {
         if (p.status !== 'fulfilled' || !p.value.length) return;
-        const raw = p.value[0];
-        // Scarta compagnie sconosciute anche qui
-        const carrier = raw.itineraries[0].segments[0].carrierCode;
-        if (!AIRLINES[carrier]) return;
-        byDate[batch[j].dep] = parseFloat(raw.price.grandTotal);
+        byDate[batch[j].dep] = parseFloat(p.value[0].price.grandTotal);
       });
     }
 
@@ -1000,8 +1007,7 @@ function renderAirlineChips(offers) {
   const byCarrier = {};
   offers.forEach(o => {
     const c    = o.out.carrier;
-    const name = aName(c);
-    if (!name) return;  // skip compagnie sconosciute
+    const name = aName(c) || c;  // usa il codice IATA se nome non trovato
     if (!byCarrier[c] || o.price < byCarrier[c].price) {
       byCarrier[c] = { price: o.price, name, emoji: aEmoji(c) };
     }
